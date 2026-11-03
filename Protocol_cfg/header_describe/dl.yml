@@ -1,0 +1,11 @@
+dl :
+   dl_type :
+     size : 16 
+   
+   Type :  
+     dl_TYPE_ipv4_e : '0x0800'
+     dl_TYPE_ipv6_e : '0x86DD'
+     dl_TYPE_arp_e : '0x0806'
+     dl_TYPE_sr_mpls_1 : '0x8847'
+   Hash :
+    - dl_type

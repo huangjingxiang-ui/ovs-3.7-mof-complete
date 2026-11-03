@@ -1,0 +1,98 @@
+[sudo] ovs 的密码： Evidence directory: /tmp/mof-smoke-j8vvohj4
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+output  cookie=0x0, duration=0.116s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE output ''
+netdev@ovs-netdev: hit:156 missed:4
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap1,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap0,tx_pcap=/tmp/mof-smoke-j8vvohj4/output.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT output PASS packets= 128 verified= 128
+mod_fields  cookie=0x0, duration=0.093s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE mod_fields ''
+netdev@ovs-netdev: hit:284 missed:4
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap3,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap2,tx_pcap=/tmp/mof-smoke-j8vvohj4/mod_fields.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT mod_fields PASS packets= 257 verified= 257
+add_protocol  cookie=0x0, duration=0.096s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE add_protocol ''
+netdev@ovs-netdev: hit:316 missed:4
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap5,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap4,tx_pcap=/tmp/mof-smoke-j8vvohj4/add_protocol.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT add_protocol PASS packets= 280 verified= 280
+del_protocol  cookie=0x0, duration=0.126s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,goto_table:1
+ cookie=0x0, duration=0.099s, table=1, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=del_protocol:vlan1 ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE del_protocol ''
+netdev@ovs-netdev: hit:347 missed:5
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap7,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap6,tx_pcap=/tmp/mof-smoke-j8vvohj4/del_protocol.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT del_protocol PASS packets= 288 verified= 288
+move_protocol  cookie=0x0, duration=0.121s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,move_protocol: src=0x2, dst=0x4,goto_table:1
+ cookie=0x0, duration=0.094s, table=1, n_packets=2, n_bytes=138, priority=200,vlan2_qid=0x64 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE move_protocol ''
+netdev@ovs-netdev: hit:315 missed:5
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap9,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap8,tx_pcap=/tmp/mof-smoke-j8vvohj4/move_protocol.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT move_protocol PASS packets= 260 verified= 260
+goto_table  cookie=0x0, duration=0.114s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,goto_table:1
+ cookie=0x0, duration=0.093s, table=1, n_packets=2, n_bytes=138, priority=200,mac_dst=0x200000000cc actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE goto_table ''
+netdev@ovs-netdev: hit:315 missed:5
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap11,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap10,tx_pcap=/tmp/mof-smoke-j8vvohj4/goto_table.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT goto_table PASS packets= 257 verified= 257
+add_bytes  cookie=0x0, duration=0.095s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_bytes: 0200000000CC0200000000AA0800,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE add_bytes ''
+netdev@ovs-netdev: hit:316 missed:4
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap13,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap12,tx_pcap=/tmp/mof-smoke-j8vvohj4/add_bytes.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT add_bytes PASS packets= 287 verified= 287
+drop  cookie=0x0, duration=0.097s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=drop
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+DELETE drop ''
+netdev@ovs-netdev: hit:284 missed:4
+  br-mof-check:
+    br-mof-check 65534/1: (tap)
+    pcap-in 1/3: (dpdk: dpdk-devargs=net_pcap15,rx_pcap=/tmp/mof-smoke-j8vvohj4/input.pcap,infinite_rx=1, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+    pcap-out 2/2: (dpdk: dpdk-devargs=net_pcap14,tx_pcap=/tmp/mof-smoke-j8vvohj4/drop.pcap, dpdk-lsc-interrupt=false, n_rxq=1, n_rxq_desc=2048, n_txq_desc=2048)
+
+RESULT drop PASS packets= 0 verified= 0
+SUMMARY 8 / 8

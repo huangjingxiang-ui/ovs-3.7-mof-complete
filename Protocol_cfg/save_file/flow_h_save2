@@ -1,0 +1,76 @@
+
+BUILD_ASSERT_DECL(sizeof(struct flow) % sizeof(uint64_t) == 0);
+BUILD_ASSERT_DECL(sizeof(struct flow_tnl) % sizeof(uint64_t) == 0);
+BUILD_ASSERT_DECL(sizeof(struct ovs_key_nsh) % sizeof(uint64_t) == 0);
+
+#define FLOW_U64S (sizeof(struct flow) / sizeof(uint64_t))
+#define FLOW_U64S_mof (sizeof(struct flow_mof) / sizeof(uint64_t))
+
+/* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
+BUILD_ASSERT_DECL(offsetof(struct flow, igmp_group_ip4) + sizeof(uint32_t)
+                  == sizeof(struct flow_tnl) + sizeof(struct ovs_key_nsh) + 300
+                  && FLOW_WC_SEQ == 42);
+
+/* Incremental points at which flow classification may be performed in
+ * segments.
+ * This is located here since this is dependent on the structure of the
+ * struct flow defined above:
+ * Each offset must be on a distinct, successive U64 boundary strictly
+ * within the struct flow. */
+enum {
+    FLOW_SEGMENT_1_ENDS_AT = offsetof(struct flow, dl_dst),
+    FLOW_SEGMENT_2_ENDS_AT = offsetof(struct flow, nw_src),
+    FLOW_SEGMENT_3_ENDS_AT = offsetof(struct flow, tp_src),
+};
+BUILD_ASSERT_DECL(FLOW_SEGMENT_1_ENDS_AT % sizeof(uint64_t) == 0);
+BUILD_ASSERT_DECL(FLOW_SEGMENT_2_ENDS_AT % sizeof(uint64_t) == 0);
+BUILD_ASSERT_DECL(FLOW_SEGMENT_3_ENDS_AT % sizeof(uint64_t) == 0);
+BUILD_ASSERT_DECL(                     0 < FLOW_SEGMENT_1_ENDS_AT);
+BUILD_ASSERT_DECL(FLOW_SEGMENT_1_ENDS_AT < FLOW_SEGMENT_2_ENDS_AT);
+BUILD_ASSERT_DECL(FLOW_SEGMENT_2_ENDS_AT < FLOW_SEGMENT_3_ENDS_AT);
+BUILD_ASSERT_DECL(FLOW_SEGMENT_3_ENDS_AT < sizeof(struct flow));
+
+/* Wildcards for a flow.
+ *
+ * A 1-bit in each bit in 'masks' indicates that the corresponding bit of
+ * the flow is significant (must match).  A 0-bit indicates that the
+ * corresponding bit of the flow is wildcarded (need not match). */
+struct flow_wildcards {
+    struct flow masks;
+};
+
+#define WC_MASK_FIELD(WC, FIELD) \
+    memset(&(WC)->masks.FIELD, 0xff, sizeof (WC)->masks.FIELD)
+#define WC_MASK_FIELD_MASK(WC, FIELD, MASK)     \
+    ((WC)->masks.FIELD |= (MASK))
+#define WC_UNMASK_FIELD(WC, FIELD) \
+    memset(&(WC)->masks.FIELD, 0, sizeof (WC)->masks.FIELD)
+
+void flow_wildcards_init_catchall(struct flow_wildcards *);
+
+void flow_wildcards_init_for_packet(struct flow_wildcards *,
+                                    const struct flow *);
+
+void flow_wildcards_clear_non_packet_fields(struct flow_wildcards *);
+
+bool flow_wildcards_is_catchall(const struct flow_wildcards *);
+
+void flow_wildcards_set_reg_mask(struct flow_wildcards *,
+                                 int idx, uint32_t mask);
+void flow_wildcards_set_xreg_mask(struct flow_wildcards *,
+                                  int idx, uint64_t mask);
+void flow_wildcards_set_xxreg_mask(struct flow_wildcards *,
+                                   int idx, ovs_u128 mask);
+
+void flow_wildcards_and(struct flow_wildcards *dst,
+                        const struct flow_wildcards *src1,
+                        const struct flow_wildcards *src2);
+void flow_wildcards_or(struct flow_wildcards *dst,
+                       const struct flow_wildcards *src1,
+                       const struct flow_wildcards *src2);
+bool flow_wildcards_has_extra(const struct flow_wildcards *,
+                              const struct flow_wildcards *);
+uint32_t flow_wildcards_hash(const struct flow_wildcards *, uint32_t basis);
+bool flow_wildcards_equal(const struct flow_wildcards *,
+                          const struct flow_wildcards *);
+

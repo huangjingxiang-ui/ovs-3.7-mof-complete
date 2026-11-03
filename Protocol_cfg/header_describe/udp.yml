@@ -1,0 +1,15 @@
+udp :
+  udp_source : 
+    size : 16
+  udp_dest : 
+    size : 16
+  len : 
+    size : 16
+  udp_check : 
+    size : 16 
+    
+  Type : 
+
+  Hash :
+    - udp_source
+    - udp_dest

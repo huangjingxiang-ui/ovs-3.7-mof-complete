@@ -1,0 +1,29 @@
+srv6 :
+  srv6_type : 
+    size : 8
+  srv6_hdr_ext_len : 
+    size : 8
+  srv6_routing_Type : 
+    size : 8
+  srv6_segments_left : 
+    size : 8 
+  srv6_last_enty : 
+    size : 8
+  srv6_flags : 
+    size : 8
+  srv6_tag :
+    size : 16
+  srv6_segmentlist : 
+    size : 1283
+
+  #Type :
+    # srv6_TYPE_ipv4_i : '0x0800'
+    #srv6_TYPE_ipv6_i : '0x29'
+
+    
+  Type : 
+    # srv6_TYPE_ipv4_i : '0x0800'
+    # srv6_TYPE_ipv6_i : '0x29'
+    srv6_TYPE_tcp : '0x06'
+    srv6_TYPE_udp : '0x11'
+

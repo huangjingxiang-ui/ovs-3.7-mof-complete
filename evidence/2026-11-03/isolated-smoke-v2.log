@@ -1,0 +1,91 @@
+[sudo] ovs 的密码： Evidence directory: /tmp/mof-smoke-hk4__uu9
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+output  cookie=0x0, duration=0.118s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT output PASS packets= 256 verified= 256
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-aab810f0
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+mod_fields  cookie=0x0, duration=0.104s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT mod_fields PASS packets= 224 verified= 224
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-c2__2v8y
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+add_protocol  cookie=0x0, duration=0.099s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT add_protocol PASS packets= 288 verified= 288
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-ts6uxdqc
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+del_protocol  cookie=0x0, duration=0.121s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,goto_table:1
+ cookie=0x0, duration=0.092s, table=1, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=del_protocol:vlan1 ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT del_protocol PASS packets= 381 verified= 381
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-v40dywy0
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+move_protocol  cookie=0x0, duration=0.137s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,move_protocol: src=0x2, dst=0x4,goto_table:1
+ cookie=0x0, duration=0.100s, table=1, n_packets=2, n_bytes=138, priority=200,vlan2_qid=0x64 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT move_protocol PASS packets= 352 verified= 352
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-9fdo0idl
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+goto_table  cookie=0x0, duration=0.120s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,goto_table:1
+ cookie=0x0, duration=0.092s, table=1, n_packets=2, n_bytes=138, priority=200,mac_dst=0x200000000cc actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT goto_table PASS packets= 352 verified= 352
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-3m6tnt_x
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+add_bytes  cookie=0x0, duration=0.099s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_bytes: 0200000000CC0200000000AA0800,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT add_bytes PASS packets= 352 verified= 352
+SUMMARY 1 / 1
+Evidence directory: /tmp/mof-smoke-ktkcturl
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+drop  cookie=0x0, duration=0.098s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=drop
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+RESULT drop PASS packets= 0 verified= 0
+SUMMARY 1 / 1

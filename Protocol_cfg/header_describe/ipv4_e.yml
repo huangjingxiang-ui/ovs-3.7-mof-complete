@@ -1,0 +1,29 @@
+ipv4_e :
+  ver_hl_e : 
+    size : 8
+  tos_e : 
+    size : 8
+  tot_len_e : 
+    size : 16
+  ip_id_e : 
+    size : 16 
+  frag_off_e : 
+    size : 16
+  ttl_e : 
+    size : 8
+  ipv4_e_type :
+    size : 8
+  ip_check_e : 
+    size : 16
+  ip_saddr_e : 
+    size : 32
+  ip_daddr_e :
+    size : 32
+    
+  Type : 
+    ipv4_e_TYPE_tcp : '0x06'
+    ipv4_e_TYPE_udp : '0x11'
+
+  Hash :
+    - ip_saddr_e
+    - ip_daddr_e

@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异常检测与恢复 - OVS管理系统</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/all.min.css') }}" rel="stylesheet">
+    <style>
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .refresh-btn {
+            transition: transform 0.2s;
+        }
+        
+        .refresh-btn.spinning {
+            transform: rotate(360deg);
+        }
+        
+        .bridge-card {
+            margin-bottom: 20px;
+        }
+        
+        .port-stats {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .success-message {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .port-selectable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .port-selectable:hover {
+            background-color: #e9ecef !important;
+            transform: scale(1.02);
+        }
+        
+        .port-selected {
+            background-color: #cff4fc !important;
+            border: 2px solid #0dcaf0 !important;
+        }
+        
+        .link-connection {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .link-normal {
+            border-left: 4px solid #28a745;
+        }
+        
+        .link-warning {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .link-error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .stats-item {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-network-wired me-2"></i>OVS管理系统
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">主页</a>
+                <a class="nav-link active" href="/anomaly-detection">异常检测与恢复</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="mb-4"><i class="fas fa-shield-alt me-2"></i>异常检测与恢复</h2>
+            </div>
+        </div>
+
+        <!-- 配置区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>容器连接配置</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="localSudoPassword" class="form-label">本机Sudo密码:</label>
+                                    <input type="password" class="form-control" id="localSudoPassword" 
+                                           placeholder="本机sudo密码（如需要）">
+                                    <div class="form-text">如果本机OVS需要sudo权限，请输入密码</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="containerIP" class="form-label">容器IP地址:</label>
+                                    <input type="text" class="form-control" id="containerIP" 
+                                           placeholder="例如: 172.17.0.2" value="">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="containerSudoPassword" class="form-label">容器Sudo密码:</label>
+                                    <input type="password" class="form-control" id="containerSudoPassword" 
+                                           placeholder="容器sudo密码">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div>
+                                        <button id="testConnectionBtn" class="btn btn-info me-2 mb-1">
+                                            <i class="fas fa-plug me-2"></i>测试连接
+                                        </button>
+                                        <button id="loadBridgesBtn" class="btn btn-success mb-1">
+                                            <i class="fas fa-download me-2"></i>加载容器信息
+                                        </button>
+                                        <button id="refreshLocalBtn" class="btn btn-outline-primary mb-1 w-100">
+                                            <i class="fas fa-refresh me-2"></i>刷新本机信息
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="connectionStatus" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 本机网桥及端口信息区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <span class="status-indicator" id="localStatus"></span>
+                            本机OVS网桥及端口信息
+                        </h5>
+                        <span id="localInfo" class="text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="localLoading" class="loading d-none">
+                            <i class="fas fa-spinner fa-spin"></i> 加载本机网桥及端口信息中...
+                        </div>
+                        <div id="localError" class="error-message d-none"></div>
+                        <div id="localBridgesContent">
+                            <p class="text-muted">正在自动加载本机OVS信息...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 容器网桥及端口信息区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <span class="status-indicator" id="containerStatus"></span>
+                            容器OVS网桥及端口信息
+                        </h5>
+                        <span id="containerInfo" class="text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="containerLoading" class="loading d-none">
+                            <i class="fas fa-spinner fa-spin"></i> 加载容器网桥及端口信息中...
+                        </div>
+                        <div id="containerError" class="error-message d-none"></div>
+                        <div id="containerBridgesContent">
+                            <p class="text-muted">请先配置容器IP和密码，测试连接成功后，点击"加载网桥及端口"获取信息</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计方式说明 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    <strong>端口数据包统计及丢包率检测机制：</strong>
+                    <ul class="mb-0 mt-2">
+                        <li><strong>发送数据包数：</strong>从流表信息中统计，计算所有output到该端口的流表项的数据包总数</li>
+                        <li><strong>接收数据包数：</strong>从传统端口统计信息中获取</li>
+                        <li><strong>丢包率统计：</strong>链路建立后开始计时，每5秒自动统计一次数据包变化量，计算5秒时间窗口内的丢包率</li>
+                        <li><strong>实时监控：</strong>系统会持续监控链路状态，自动更新丢包率信息，无需手动刷新</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 链路连接关系和异常检测区域 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>链路连接关系与异常检测
+                        </h5>
+                        <div>
+                            <button id="refreshLinksBtn" class="btn btn-outline-primary btn-sm" 
+                                    title="刷新所有端口状态、链路统计并检测异常（包括丢包检测）">
+                                <i class="fas fa-sync-alt me-1"></i>刷新统计
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="linkSelectionInfo" class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>使用说明：</strong>先点击本机中的一个端口，再点击容器中的一个端口，系统将自动检测异常。
+                        </div>
+                        <div id="linksContainer">
+                            <p class="text-muted text-center">暂无链路连接，请按照上述说明选择端口建立连接关系</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        // 全局变量
+        let localBridgesData = [];
+        let containerBridgesData = [];
+        let selectedLocalPort = null;
+        let selectedContainerPort = null;
+        let linkConnections = [];
+        let currentContainerIP = '';
+        let linkMonitorIntervals = {}; // 存储每个链路的定时器ID
+
+        // 工具函数
+        function showLoading(elementId) {
+            document.getElementById(elementId).classList.remove('d-none');
+        }
+
+        function hideLoading(elementId) {
+            document.getElementById(elementId).classList.add('d-none');
+        }
+
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.classList.remove('d-none');
+        }
+
+        function hideError(elementId) {
+            document.getElementById(elementId).classList.add('d-none');
+        }
+
+        function updateStatus(elementId, status) {
+            const element = document.getElementById(elementId);
+            element.className = 'status-indicator';
+            element.classList.add(`status-${status}`);
+        }
+
+        function addSpinAnimation(buttonId) {
+            const btn = document.getElementById(buttonId);
+            const icon = btn.querySelector('i');
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+        }
+
+        function removeSpinAnimation(buttonId) {
+            const btn = document.getElementById(buttonId);
+            const icon = btn.querySelector('i');
+            icon.classList.remove('fa-spin');
+            btn.disabled = false;
+        }
+
+        // API调用函数
+        async function callAPI(url, method = 'POST', data = {}) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (method === 'POST' && Object.keys(data).length > 0) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(url, options);
+                const result = await response.json();
+                
+                return {
+                    success: response.ok,
+                    data: result,
+                    status: response.status
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error.message,
+                    status: 0
+                };
+            }
+        }
+
+        // 获取本机网桥及端口信息
+        async function loadLocalBridgesAndPorts(sudoPassword = '') {
+            hideError('localError');
+            showLoading('localLoading');
+            updateStatus('localStatus', 'warning');
+            
+            // 更新本机信息显示
+            document.getElementById('localInfo').textContent = '正在加载本机信息...';
+
+            try {
+                // 准备请求数据
+                const requestData = sudoPassword ? { sudo_password: sudoPassword } : {};
+                
+                // 首先获取本机网桥列表
+                const bridgesResult = await callAPI('/api/bridges', 'POST', requestData);
+                
+                // 处理需要密码的情况
+                if (!bridgesResult.success || 
+                    (bridgesResult.data && bridgesResult.data.status === 'password_required')) {
+                    updateStatus('localStatus', 'warning');
+                    document.getElementById('localInfo').textContent = '需要sudo权限';
+                    document.getElementById('localBridgesContent').innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>需要sudo权限</strong><br>
+                            本机OVS操作需要sudo权限。请在容器配置区域输入sudo密码后，
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadLocalBridgesWithPassword()">
+                                <i class="fas fa-key me-1"></i>重新加载本机信息
+                            </button>
+                        </div>
+                    `;
+                    hideLoading('localLoading');
+                    return;
+                }
+                
+                if (!bridgesResult.success || bridgesResult.data.status !== 'success') {
+                    updateStatus('localStatus', 'offline');
+                    showError('localError', bridgesResult.data?.message || '获取本机网桥失败');
+                    document.getElementById('localInfo').textContent = '';
+                    hideLoading('localLoading');
+                    return;
+                }
+
+                const bridges = bridgesResult.data.bridges || [];
+                localBridgesData = [];
+
+                // 为每个网桥获取端口信息
+                for (let bridge of bridges) {
+                    try {
+                        const portsResult = await callAPI(`/api/local-bridge-ports/${bridge}`, 'POST', requestData);
+                        
+                        const bridgeData = {
+                            name: bridge,
+                            ports: portsResult.success && portsResult.data.status === 'success' 
+                                ? portsResult.data.ports || [] 
+                                : [],
+                            error: portsResult.success ? null : (portsResult.data?.message || '获取端口失败')
+                        };
+                        
+                        localBridgesData.push(bridgeData);
+                    } catch (error) {
+                        localBridgesData.push({
+                            name: bridge,
+                            ports: [],
+                            error: `获取端口信息失败: ${error.message}`
+                        });
+                    }
+                }
+
+                updateStatus('localStatus', 'online');
+                displayLocalBridgesAndPorts(localBridgesData);
+                document.getElementById('localInfo').textContent = `本机 - 共 ${bridges.length} 个网桥`;
+
+            } catch (error) {
+                updateStatus('localStatus', 'offline');
+                showError('localError', `加载过程中发生错误: ${error.message}`);
+                document.getElementById('localInfo').textContent = '';
+            } finally {
+                hideLoading('localLoading');
+            }
+        }
+        
+        // 使用密码重新加载本机网桥信息
+        function loadLocalBridgesWithPassword() {
+            const sudoPassword = document.getElementById('localSudoPassword').value;
+            if (!sudoPassword) {
+                showError('localError', '请先输入本机sudo密码');
+                return;
+            }
+            loadLocalBridgesAndPorts(sudoPassword);
+        }
+        
+        // 刷新本机信息（使用本机密码字段）
+        function refreshLocalBridges() {
+            const sudoPassword = document.getElementById('localSudoPassword').value;
+            loadLocalBridgesAndPorts(sudoPassword);
+        }
+
+        // 获取容器网桥及端口信息
+        async function loadContainerBridgesAndPorts() {
+            const containerIP = document.getElementById('containerIP').value.trim();
+            
+            if (!containerIP) {
+                showError('containerError', '请先输入容器IP地址');
+                return;
+            }
+
+            hideError('containerError');
+            showLoading('containerLoading');
+            updateStatus('containerStatus', 'warning');
+            
+            // 更新容器信息显示
+            document.getElementById('containerInfo').textContent = `正在加载 ${containerIP} 的信息...`;
+
+            const sudoPassword = document.getElementById('containerSudoPassword').value;
+            const requestData = sudoPassword ? { sudo_password: sudoPassword } : {};
+
+            try {
+                // 首先获取网桥列表
+                const bridgesResult = await callAPI(`/api/container-bridges/${containerIP}`, 'POST', requestData);
+                
+                if (!bridgesResult.success || bridgesResult.data.status !== 'success') {
+                    updateStatus('containerStatus', 'offline');
+                    showError('containerError', bridgesResult.data?.message || '获取容器网桥失败');
+                    document.getElementById('containerInfo').textContent = '';
+                    hideLoading('containerLoading');
+                    return;
+                }
+
+                const bridges = bridgesResult.data.bridges || [];
+                containerBridgesData = [];
+
+                // 为每个网桥获取端口信息
+                for (let bridge of bridges) {
+                    try {
+                        const portsResult = await callAPI(`/api/container-bridge-ports/${containerIP}/${bridge}`, 'POST', requestData);
+                        
+                        const bridgeData = {
+                            name: bridge,
+                            ports: portsResult.success && portsResult.data.status === 'success' 
+                                ? portsResult.data.ports || [] 
+                                : [],
+                            error: portsResult.success ? null : (portsResult.data?.message || '获取端口失败')
+                        };
+                        
+                        containerBridgesData.push(bridgeData);
+                    } catch (error) {
+                        containerBridgesData.push({
+                            name: bridge,
+                            ports: [],
+                            error: `获取端口信息失败: ${error.message}`
+                        });
+                    }
+                }
+
+                updateStatus('containerStatus', 'online');
+                currentContainerIP = containerIP;  // 保存当前容器IP
+                displayContainerBridgesAndPorts(containerBridgesData, containerIP);
+                document.getElementById('containerInfo').textContent = `容器 ${containerIP} - 共 ${bridges.length} 个网桥`;
+
+            } catch (error) {
+                updateStatus('containerStatus', 'offline');
+                showError('containerError', `加载过程中发生错误: ${error.message}`);
+                document.getElementById('containerInfo').textContent = '';
+            } finally {
+                hideLoading('containerLoading');
+            }
+        }
+
+        // 显示本机网桥及端口信息
+        function displayLocalBridgesAndPorts(bridgesData) {
+            const container = document.getElementById('localBridgesContent');
+            
+            if (bridgesData.length === 0) {
+                container.innerHTML = '<p class="text-muted">未找到网桥</p>';
+                return;
+            }
+
+            let html = '';
+            
+            bridgesData.forEach((bridgeData, index) => {
+                html += `
+                    <div class="card mb-3 ${bridgeData.error ? 'border-warning' : 'border-success'}">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-bridge me-2 text-success"></i>
+                                网桥: <strong>${bridgeData.name}</strong>
+                                ${bridgeData.error ? 
+                                    '<span class="badge bg-warning text-dark ms-2">端口加载失败</span>' : 
+                                    `<span class="badge bg-success ms-2">${bridgeData.ports.length} 个端口</span>`
+                                }
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                `;
+
+                if (bridgeData.error) {
+                    html += `
+                        <div class="alert alert-warning mb-2">
+                            <i class="fas fa-exclamation-triangle me-2"></i>${bridgeData.error}
+                        </div>
+                    `;
+                }
+
+                if (bridgeData.ports.length === 0) {
+                    html += '<p class="text-muted mb-0">该网桥下暂无端口或端口获取失败</p>';
+                } else {
+                    html += '<div class="row">';
+                    bridgeData.ports.forEach((port, portIndex) => {
+                        // 判断端口类型
+                        let portIcon = 'fas fa-ethernet';
+                        let portType = '未知端口';
+                        let portClass = 'text-secondary';
+                        
+                        if (port.name) {
+                            if (port.name.startsWith('veth')) {
+                                portIcon = 'fas fa-link';
+                                portType = 'veth虚拟端口';
+                                portClass = 'text-success';
+                            } else if (port.name.startsWith('eth')) {
+                                portIcon = 'fas fa-network-wired';
+                                portType = '以太网端口';
+                                portClass = 'text-info';
+                            } else if (port.name.includes('tap')) {
+                                portIcon = 'fas fa-plug';
+                                portType = 'TAP端口';
+                                portClass = 'text-warning';
+                            } else if (port.name === 'LOCAL' || port.name === bridgeData.name) {
+                                portIcon = 'fas fa-bridge';
+                                portType = '内部端口';
+                                portClass = 'text-primary';
+                            }
+                        }
+
+                        html += `
+                            <div class="col-md-6 col-lg-4 mb-2">
+                                <div class="border rounded p-2 h-100 bg-light port-selectable" 
+                                     data-port-type="local" 
+                                     data-bridge="${bridgeData.name}"
+                                     data-port-number="${port.number || portIndex + 1}"
+                                     data-port-name="${port.name || `端口${port.number || portIndex + 1}`}"
+                                     onclick="selectPort(this)">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="${portIcon} me-2 ${portClass}"></i>
+                                        <strong class="text-truncate">${port.name || `端口${port.number || portIndex + 1}`}</strong>
+                                    </div>
+                                    <div class="small text-muted">
+                                        <div>端口号: ${port.number || 'N/A'}</div>
+                                        <div class="d-flex align-items-center">
+                                            管理状态: 
+                                            <span class="ms-1 badge ${port.admin_state === 'up' ? 'bg-success' : port.admin_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                                ${port.admin_state || '未知'}
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            链路状态: 
+                                            <span class="ms-1 badge ${port.link_state === 'up' ? 'bg-success' : port.link_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                                ${port.link_state || '未知'}
+                                            </span>
+                                        </div>
+                                        ${port.mac_address ? `<div class="text-truncate">MAC: ${port.mac_address}</div>` : ''}
+                                        ${port.statistics && port.statistics.raw ? `<div class="text-truncate mt-1"><small class="text-info"><i class="fas fa-chart-line me-1"></i>统计数据可用</small></div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 显示容器网桥及端口信息
+        function displayContainerBridgesAndPorts(bridgesData, containerIP) {
+            const container = document.getElementById('containerBridgesContent');
+            
+            if (bridgesData.length === 0) {
+                container.innerHTML = '<p class="text-muted">未找到网桥</p>';
+                return;
+            }
+
+            let html = '';
+            
+            bridgesData.forEach((bridgeData, index) => {
+                html += `
+                    <div class="card mb-3 ${bridgeData.error ? 'border-warning' : 'border-primary'}">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-bridge me-2 text-primary"></i>
+                                网桥: <strong>${bridgeData.name}</strong>
+                                ${bridgeData.error ? 
+                                    '<span class="badge bg-warning text-dark ms-2">端口加载失败</span>' : 
+                                    `<span class="badge bg-primary ms-2">${bridgeData.ports.length} 个端口</span>`
+                                }
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                `;
+
+                if (bridgeData.error) {
+                    html += `
+                        <div class="alert alert-warning mb-2">
+                            <i class="fas fa-exclamation-triangle me-2"></i>${bridgeData.error}
+                        </div>
+                    `;
+                }
+
+                if (bridgeData.ports.length === 0) {
+                    html += '<p class="text-muted mb-0">该网桥下暂无端口或端口获取失败</p>';
+                } else {
+                    html += '<div class="row">';
+                    bridgeData.ports.forEach((port, portIndex) => {
+                        // 判断端口类型
+                        let portIcon = 'fas fa-ethernet';
+                        let portType = '未知端口';
+                        let portClass = 'text-secondary';
+                        
+                        if (port.name) {
+                            if (port.name.startsWith('veth')) {
+                                portIcon = 'fas fa-link';
+                                portType = 'veth虚拟端口';
+                                portClass = 'text-success';
+                            } else if (port.name.startsWith('eth')) {
+                                portIcon = 'fas fa-network-wired';
+                                portType = '以太网端口';
+                                portClass = 'text-info';
+                            } else if (port.name.includes('tap')) {
+                                portIcon = 'fas fa-plug';
+                                portType = 'TAP端口';
+                                portClass = 'text-warning';
+                            } else if (port.name === bridgeData.name) {
+                                portIcon = 'fas fa-bridge';
+                                portType = '内部端口';
+                                portClass = 'text-primary';
+                            }
+                        }
+
+                        html += `
+                            <div class="col-md-6 col-lg-4 mb-2">
+                                <div class="border rounded p-2 h-100 port-selectable" 
+                                     data-port-type="container" 
+                                     data-bridge="${bridgeData.name}"
+                                     data-port-number="${port.number || portIndex + 1}"
+                                     data-port-name="${port.name || `端口${port.number || portIndex + 1}`}"
+                                     onclick="selectPort(this)">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="${portIcon} me-2 ${portClass}"></i>
+                                        <strong class="text-truncate">${port.name || `端口${port.number || portIndex + 1}`}</strong>
+                                    </div>
+                                    <div class="small text-muted">
+                                        <div>端口号: ${port.number || 'N/A'}</div>
+                                        <div class="d-flex align-items-center">
+                                            管理状态: 
+                                            <span class="ms-1 badge ${port.admin_state === 'up' ? 'bg-success' : port.admin_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                                ${port.admin_state || '未知'}
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            链路状态: 
+                                            <span class="ms-1 badge ${port.link_state === 'up' ? 'bg-success' : port.link_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                                ${port.link_state || '未知'}
+                                            </span>
+                                        </div>
+                                        ${port.mac_address ? `<div class="text-truncate">MAC: ${port.mac_address}</div>` : ''}
+                                        ${port.statistics && port.statistics.raw ? `<div class="text-truncate mt-1"><small class="text-info"><i class="fas fa-chart-line me-1"></i>统计数据可用</small></div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 测试连接
+        async function testConnection() {
+            const containerIP = document.getElementById('containerIP').value.trim();
+            
+            if (!containerIP) {
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<div class="error-message"><i class="fas fa-times-circle me-2"></i>请先输入容器IP地址</div>';
+                return;
+            }
+
+            document.getElementById('connectionStatus').innerHTML = 
+                '<div class="loading"><i class="fas fa-spinner fa-spin"></i> 测试连接中...</div>';
+
+            // 通过后端代理测试容器连接 - 尝试获取容器协议列表
+            const result = await callAPI(`/api/test-container-connection/${containerIP}`, 'POST');
+
+            if (result.success) {
+                if (result.data.status === 'success') {
+                    document.getElementById('connectionStatus').innerHTML = 
+                        '<div class="success-message"><i class="fas fa-check-circle me-2"></i>容器连接成功！可以访问容器的OVS管理接口</div>';
+                } else {
+                    document.getElementById('connectionStatus').innerHTML = 
+                        `<div class="error-message"><i class="fas fa-times-circle me-2"></i>容器连接失败: ${result.data.message || '未知错误'}</div>`;
+                }
+            } else {
+                let errorMsg = '';
+                if (result.status === 503) {
+                    errorMsg = '无法连接到容器，请检查：\n1. 容器IP是否正确\n2. 容器是否在运行\n3. 容器端口5000是否开放\n4. 网络是否可达';
+                } else if (result.status === 504) {
+                    errorMsg = '连接容器超时，请检查网络连接';
+                } else {
+                    errorMsg = `连接错误: ${result.error || '未知错误'}`;
+                }
+                
+                document.getElementById('connectionStatus').innerHTML = 
+                    `<div class="error-message"><i class="fas fa-times-circle me-2"></i>${errorMsg}</div>`;
+            }
+        }
+
+        // 端口选择函数
+        function selectPort(element) {
+            const portType = element.getAttribute('data-port-type');
+            const bridge = element.getAttribute('data-bridge');
+            const portNumber = element.getAttribute('data-port-number');
+            const portName = element.getAttribute('data-port-name');
+            
+            const portInfo = {
+                type: portType,
+                bridge: bridge,
+                number: portNumber,
+                name: portName,
+                element: element
+            };
+            
+            if (portType === 'local') {
+                // 清除之前的本机端口选择
+                if (selectedLocalPort && selectedLocalPort.element) {
+                    selectedLocalPort.element.classList.remove('port-selected');
+                }
+                
+                // 选择新的本机端口
+                selectedLocalPort = portInfo;
+                element.classList.add('port-selected');
+                
+                updateLinkSelectionInfo();
+            } else if (portType === 'container') {
+                // 清除之前的容器端口选择
+                if (selectedContainerPort && selectedContainerPort.element) {
+                    selectedContainerPort.element.classList.remove('port-selected');
+                }
+                
+                // 选择新的容器端口
+                selectedContainerPort = portInfo;
+                element.classList.add('port-selected');
+                
+                updateLinkSelectionInfo();
+                
+                // 如果本机和容器端口都已选择，自动创建链路
+                if (selectedLocalPort && selectedContainerPort) {
+                    createLinkConnection();
+                }
+            }
+        }
+        
+        // 更新链路选择信息
+        function updateLinkSelectionInfo() {
+            const infoDiv = document.getElementById('linkSelectionInfo');
+            let message = '';
+            
+            if (!selectedLocalPort && !selectedContainerPort) {
+                message = '<i class="fas fa-info-circle me-2"></i><strong>使用说明：</strong>先点击本机中的一个端口，再点击容器中的一个端口，系统将自动建立链路连接关系并检测异常。';
+                infoDiv.className = 'alert alert-info';
+            } else if (selectedLocalPort && !selectedContainerPort) {
+                message = `<i class="fas fa-check-circle me-2"></i><strong>已选择本机端口：</strong>${selectedLocalPort.name} (${selectedLocalPort.bridge}) - 请继续选择容器端口`;
+                infoDiv.className = 'alert alert-warning';
+            } else if (selectedContainerPort && !selectedLocalPort) {
+                message = `<i class="fas fa-check-circle me-2"></i><strong>已选择容器端口：</strong>${selectedContainerPort.name} (${selectedContainerPort.bridge}) - 请先选择本机端口`;
+                infoDiv.className = 'alert alert-warning';
+            } else {
+                message = `<i class="fas fa-link me-2"></i><strong>正在建立链路：</strong>${selectedLocalPort.name} ↔ ${selectedContainerPort.name}`;
+                infoDiv.className = 'alert alert-success';
+            }
+            
+            infoDiv.innerHTML = message;
+        }
+        
+        // 创建链路连接
+        async function createLinkConnection() {
+            if (!selectedLocalPort || !selectedContainerPort || !currentContainerIP) {
+                return;
+            }
+            
+            const linkId = `${selectedLocalPort.bridge}_${selectedLocalPort.number}_${selectedContainerPort.bridge}_${selectedContainerPort.number}`;
+            
+            // 检查是否已存在相同的链路
+            const existingLinkIndex = linkConnections.findIndex(link => link.id === linkId);
+            
+            const linkData = {
+                id: linkId,
+                localPort: { ...selectedLocalPort },
+                containerPort: { ...selectedContainerPort },
+                containerIP: currentContainerIP,
+                status: 'checking',
+                stats: null,
+                anomaly: null,
+                localPortStates: null,
+                containerPortStates: null,
+                previousStats: null,  // 用于存储上一次的统计数据
+                lastUpdateTime: null, // 上一次更新时间
+                packetLossRate: null  // 丢包率信息
+            };
+            
+            if (existingLinkIndex >= 0) {
+                linkConnections[existingLinkIndex] = linkData;
+            } else {
+                linkConnections.push(linkData);
+            }
+            
+            // 清除选择
+            clearPortSelections();
+            
+            // 更新显示
+            displayLinkConnections();
+            
+            // 立即获取端口状态信息
+            await refreshLinkStats(linkId);
+            
+            // 启动5秒定时监控
+            startLinkMonitoring(linkId);
+        }
+        
+        // 清除端口选择
+        function clearPortSelections() {
+            if (selectedLocalPort && selectedLocalPort.element) {
+                selectedLocalPort.element.classList.remove('port-selected');
+            }
+            if (selectedContainerPort && selectedContainerPort.element) {
+                selectedContainerPort.element.classList.remove('port-selected');
+            }
+            
+            selectedLocalPort = null;
+            selectedContainerPort = null;
+            updateLinkSelectionInfo();
+        }
+        
+        // 显示链路连接
+        function displayLinkConnections() {
+            const container = document.getElementById('linksContainer');
+            
+            if (linkConnections.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">暂无链路连接，请按照上述说明选择端口建立连接关系</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            linkConnections.forEach((link, index) => {
+                let statusClass = 'link-normal';
+                let statusIcon = 'fas fa-check-circle text-success';
+                let statusText = '正常';
+                let linkState = 'unknown';
+                
+                // 检查链路状态：任何一个端口的任何一个状态为down，则链路为关闭
+                if (link.localPortStates && link.containerPortStates) {
+                    // 检查本机端口状态 - 任何状态为down都算关闭
+                    const localDown = (
+                        link.localPortStates.admin_state === 'down' || 
+                        link.localPortStates.link_state === 'down'
+                    );
+                    
+                    // 检查容器端口状态 - 任何状态为down都算关闭
+                    const containerDown = (
+                        link.containerPortStates.admin_state === 'down' || 
+                        link.containerPortStates.link_state === 'down'
+                    );
+                    
+                    // 检查是否有未知状态
+                    const localUnknown = (
+                        !link.localPortStates.admin_state || 
+                        link.localPortStates.admin_state === 'unknown' ||
+                        link.localPortStates.admin_state === '未知' ||
+                        !link.localPortStates.link_state || 
+                        link.localPortStates.link_state === 'unknown' ||
+                        link.localPortStates.link_state === '未知'
+                    );
+                    
+                    const containerUnknown = (
+                        !link.containerPortStates.admin_state || 
+                        link.containerPortStates.admin_state === 'unknown' ||
+                        link.containerPortStates.admin_state === '未知' ||
+                        !link.containerPortStates.link_state || 
+                        link.containerPortStates.link_state === 'unknown' ||
+                        link.containerPortStates.link_state === '未知'
+                    );
+                    
+                    if (localDown || containerDown) {
+                        linkState = 'closed';
+                    } else if (localUnknown || containerUnknown) {
+                        linkState = 'unknown';
+                    } else {
+                        linkState = 'open';
+                    }
+                } else {
+                    // 如果没有状态信息，默认为未知
+                    linkState = 'unknown';
+                }
+                
+                // 根据链路状态设置显示样式（在检查其他状态之前）
+                if (linkState === 'closed') {
+                    statusClass = 'link-error';
+                    statusIcon = 'fas fa-times-circle text-danger';
+                    statusText = '链路关闭';
+                } else if (linkState === 'open') {
+                    statusClass = 'link-normal';
+                    statusIcon = 'fas fa-check-circle text-success';
+                    statusText = '链路开启';
+                } else {
+                    statusClass = 'link-warning';
+                    statusIcon = 'fas fa-question-circle text-warning';
+                    statusText = '状态未知';
+                }
+                
+                if (link.status === 'checking') {
+                    statusClass = '';
+                    statusIcon = 'fas fa-spinner fa-spin text-info';
+                    statusText = '检查中...';
+                } else if (link.status === 'hibernated') {
+                    statusClass = 'link-warning';
+                    statusIcon = 'fas fa-bed text-secondary';
+                    statusText = '已休眠';
+                } else if (link.anomaly) {
+                    // 如果有异常，优先显示异常信息，但仍然考虑链路状态
+                    if (link.anomaly.severity === 'error') {
+                        statusClass = 'link-error';
+                        statusIcon = 'fas fa-exclamation-circle text-danger';
+                        if (linkState === 'closed') {
+                            statusText = '链路关闭+异常';
+                        } else {
+                            statusText = '异常';
+                        }
+                    } else if (link.anomaly.severity === 'warning') {
+                        statusClass = 'link-warning';
+                        statusIcon = 'fas fa-exclamation-triangle text-warning';
+                        if (linkState === 'closed') {
+                            statusText = '链路关闭+警告';
+                        } else {
+                            statusText = '警告';
+                        }
+                    }
+                }
+                
+                html += `
+                    <div class="link-connection ${statusClass}" data-link-id="${link.id}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="${statusIcon} me-2"></i>
+                                    本机: ${link.localPort.bridge}: ${link.localPort.name} ↔ ${link.containerIP}: ${link.containerPort.bridge}: ${link.containerPort.name}
+                                </h6>
+                                <div class="small text-muted mb-2">
+                                    <strong>链路状态: 
+                                        <span class="badge ${linkState === 'open' ? 'bg-success' : linkState === 'closed' ? 'bg-danger' : 'bg-warning'}">
+                                            ${linkState === 'open' ? '开启 🟢' : linkState === 'closed' ? '关闭 🔴' : '未知 ⚪'}
+                                        </span>
+                                    </strong>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge ${statusClass === 'link-error' ? 'bg-danger' : statusClass === 'link-warning' ? 'bg-warning' : 'bg-success'}">${statusText}</span>
+                                ${link.anomaly && link.anomaly.severity === 'error' && link.anomaly.hasPacketLoss ? 
+                                    `<button class="btn btn-sm btn-warning ms-2" onclick="hibernateLink('${link.id}')" title="休眠异常链路">
+                                        <i class="fas fa-bed me-1"></i>休眠链路
+                                    </button>` : ''
+                                }
+                                ${link.status === 'hibernated' ? 
+                                    `<button class="btn btn-sm btn-success ms-2" onclick="wakeupLink('${link.id}')" title="恢复链路">
+                                        <i class="fas fa-play me-1"></i>恢复链路
+                                    </button>` : ''
+                                }
+                                <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeLinkConnection('${link.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                `;
+                
+                if (link.stats) {
+                    html += `
+                        <div class="stats-grid">
+                            <div class="stats-item">
+                                <strong>本机: ${link.localPort.bridge}: ${link.localPort.name}</strong><br>
+                                ${link.localPortStates ? `
+                                <small>管理状态: <span class="badge ${link.localPortStates.admin_state === 'up' ? 'bg-success' : link.localPortStates.admin_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                    ${link.localPortStates.admin_state || '未知'}
+                                </span></small><br>
+                                <small>链路状态: <span class="badge ${link.localPortStates.link_state === 'up' ? 'bg-success' : link.localPortStates.link_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                    ${link.localPortStates.link_state || '未知'}
+                                </span></small><br>
+                                ` : '<small class="text-muted">状态获取中...</small><br>'}
+                                <small>发送: ${link.stats.local.tx_packets}包 (${formatBytes(link.stats.local.tx_bytes)}) <span class="text-info" title="基于流表统计">📊</span></small><br>
+                                <small>接收: ${link.stats.local.rx_packets}包 (${formatBytes(link.stats.local.rx_bytes)})</small>
+                            </div>
+                            <div class="stats-item">
+                                <strong>${link.containerIP}: ${link.containerPort.bridge}: ${link.containerPort.name}</strong><br>
+                                ${link.containerPortStates ? `
+                                <small>管理状态: <span class="badge ${link.containerPortStates.admin_state === 'up' ? 'bg-success' : link.containerPortStates.admin_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                    ${link.containerPortStates.admin_state || '未知'}
+                                </span></small><br>
+                                <small>链路状态: <span class="badge ${link.containerPortStates.link_state === 'up' ? 'bg-success' : link.containerPortStates.link_state === 'down' ? 'bg-danger' : 'bg-secondary'} text-white">
+                                    ${link.containerPortStates.link_state || '未知'}
+                                </span></small><br>
+                                ` : '<small class="text-muted">状态获取中...</small><br>'}
+                                <small>发送: ${link.stats.container.tx_packets}包 (${formatBytes(link.stats.container.tx_bytes)}) <span class="text-info" title="基于流表统计">📊</span></small><br>
+                                <small>接收: ${link.stats.container.rx_packets}包 (${formatBytes(link.stats.container.rx_bytes)})</small>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 显示丢包率信息
+                    if (link.packetLossRate) {
+                        const plr = link.packetLossRate;
+                        const timeInfo = plr.timeDiff > 0 ? `（统计时长: ${plr.timeDiff.toFixed(1)}秒）` : '';
+                        
+                        html += `
+                            <div class="mt-2 p-2 bg-info bg-opacity-10 rounded border border-info">
+                                <strong><i class="fas fa-chart-line me-1"></i>丢包率统计 ${timeInfo}</strong><br>
+                                <div class="row mt-2">
+                                    <div class="col-6">
+                                        <small><strong>本机→容器:</strong></small><br>
+                                        ${plr.localToContainer.rate !== null ? `
+                                            <small>发送: ${plr.localToContainer.sentPackets || 0}包</small><br>
+                                            <small>接收: ${plr.localToContainer.receivedPackets || 0}包</small><br>
+                                            <small>丢失: ${plr.localToContainer.lossPackets || 0}包</small><br>
+                                            <small class="${plr.localToContainer.rate >= 50 ? 'text-danger fw-bold' : plr.localToContainer.rate >= 10 ? 'text-warning fw-bold' : 'text-success'}">
+                                                <span class="badge ${plr.localToContainer.rate >= 50 ? 'bg-danger' : plr.localToContainer.rate >= 10 ? 'bg-warning' : 'bg-success'}">
+                                                    ${plr.localToContainer.message}
+                                                </span>
+                                            </small>
+                                        ` : `<small class="text-muted">${plr.localToContainer.message}</small>`}
+                                    </div>
+                                    <div class="col-6">
+                                        <small><strong>容器→本机:</strong></small><br>
+                                        ${plr.containerToLocal.rate !== null ? `
+                                            <small>发送: ${plr.containerToLocal.sentPackets || 0}包</small><br>
+                                            <small>接收: ${plr.containerToLocal.receivedPackets || 0}包</small><br>
+                                            <small>丢失: ${plr.containerToLocal.lossPackets || 0}包</small><br>
+                                            <small class="${plr.containerToLocal.rate >= 50 ? 'text-danger fw-bold' : plr.containerToLocal.rate >= 10 ? 'text-warning fw-bold' : 'text-success'}">
+                                                <span class="badge ${plr.containerToLocal.rate >= 50 ? 'bg-danger' : plr.containerToLocal.rate >= 10 ? 'bg-warning' : 'bg-success'}">
+                                                    ${plr.containerToLocal.message}
+                                                </span>
+                                            </small>
+                                        ` : `<small class="text-muted">${plr.containerToLocal.message}</small>`}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    if (link.anomaly) {
+                        html += `
+                            <div class="mt-2 p-2 bg-light rounded">
+                                <small><strong>异常详情：</strong>${link.anomaly.message}</small>
+                            </div>
+                        `;
+                    }
+                }
+                
+                html += '</div>';
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // 移除链路连接
+        function removeLinkConnection(linkId) {
+            // 停止该链路的监控定时器
+            stopLinkMonitoring(linkId);
+            
+            linkConnections = linkConnections.filter(link => link.id !== linkId);
+            displayLinkConnections();
+        }
+        
+        // 刷新链路统计
+        async function refreshLinkStats(linkId = null) {
+            const linksToRefresh = linkId ? linkConnections.filter(link => link.id === linkId) : linkConnections;
+            
+            for (let link of linksToRefresh) {
+                try {
+                    link.status = 'checking';
+                    displayLinkConnections();
+                    
+                    // 保存上一次的统计数据和时间
+                    const previousStats = link.stats;
+                    const previousTime = link.lastUpdateTime;
+                    const currentTime = Date.now();
+                    
+                    // 获取本机端口状态信息
+                    try {
+                        // 优先从已加载的本机端口数据中获取状态
+                        let foundLocalState = null;
+                        for (let bridgeData of localBridgesData) {
+                            if (bridgeData.name === link.localPort.bridge) {
+                                const portData = bridgeData.ports.find(p => p.name === link.localPort.name);
+                                if (portData) {
+                                    foundLocalState = {
+                                        admin_state: portData.admin_state || 'unknown',
+                                        link_state: portData.link_state || 'unknown'
+                                    };
+                                    console.log(`从本机端口数据中找到状态: ${link.localPort.name}`, foundLocalState);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (foundLocalState) {
+                            link.localPortStates = foundLocalState;
+                        } else {
+                            // 如果本地数据中没有找到，再调用API
+                            const localPortStatesResult = await callAPI('/api/ovs-interface-states', 'POST', {
+                                sudo_password: document.getElementById('localSudoPassword').value
+                            });
+                            
+                            if (localPortStatesResult.success && localPortStatesResult.data.status === 'success') {
+                                link.localPortStates = localPortStatesResult.data.interfaces[link.localPort.name] || {
+                                    admin_state: '未知',
+                                    link_state: '未知'
+                                };
+                            } else {
+                                console.warn('本机端口状态获取失败:', localPortStatesResult.data?.message);
+                                link.localPortStates = {
+                                    admin_state: '未知',
+                                    link_state: '未知'
+                                };
+                            }
+                        }
+                    } catch (error) {
+                        console.error('获取本机端口状态失败:', error);
+                        link.localPortStates = {
+                            admin_state: '错误',
+                            link_state: '错误'
+                        };
+                    }
+                    
+                    try {
+                        // 优先从已加载的容器端口数据中获取状态
+                        let foundContainerState = null;
+                        for (let bridgeData of containerBridgesData) {
+                            if (bridgeData.name === link.containerPort.bridge) {
+                                const portData = bridgeData.ports.find(p => p.name === link.containerPort.name);
+                                if (portData) {
+                                    foundContainerState = {
+                                        admin_state: portData.admin_state || 'unknown',
+                                        link_state: portData.link_state || 'unknown'
+                                    };
+                                    console.log(`从容器端口数据中找到状态: ${link.containerPort.name}`, foundContainerState);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (foundContainerState) {
+                            link.containerPortStates = foundContainerState;
+                        } else {
+                            console.log(`未在容器端口数据中找到 ${link.containerPort.name}，尝试API调用`);
+                            // 如果本地数据中没有找到，再调用API
+                            const containerPortStatesResult = await callAPI(`/api/container-ovs-interface-states/${link.containerIP}`, 'POST', {
+                                sudo_password: document.getElementById('containerSudoPassword').value
+                            });
+                            
+                            console.log('容器端口状态API响应:', containerPortStatesResult);
+                            
+                            if (containerPortStatesResult.success && containerPortStatesResult.data.status === 'success') {
+                                const availableInterfaces = containerPortStatesResult.data.interfaces || {};
+                                console.log('可用的容器端口状态:', Object.keys(availableInterfaces));
+                                
+                                // 直接匹配端口名称
+                                link.containerPortStates = availableInterfaces[link.containerPort.name];
+                                
+                                // 如果没有找到精确匹配，尝试其他可能的匹配方式
+                                if (!link.containerPortStates) {
+                                    const portName = link.containerPort.name;
+                                    const alternativeNames = [
+                                        portName,
+                                        portName.replace(/^.*:/, ''), // 移除前缀
+                                        portName.split(':').pop(), // 取最后一部分
+                                    ];
+                                    
+                                    // 逐一尝试匹配
+                                    for (const altName of alternativeNames) {
+                                        if (availableInterfaces[altName]) {
+                                            link.containerPortStates = availableInterfaces[altName];
+                                            console.log(`通过名称 '${altName}' 找到容器端口状态`);
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // 如果仍然没找到，显示调试信息
+                                    if (!link.containerPortStates) {
+                                        console.warn(`未找到端口 '${portName}' 的状态，尝试的名称:`, alternativeNames);
+                                        console.warn('可用的端口:', Object.keys(availableInterfaces));
+                                        link.containerPortStates = {
+                                            admin_state: '未找到',
+                                            link_state: '未找到'
+                                        };
+                                    }
+                                } else {
+                                    console.log(`直接匹配找到容器端口状态: ${link.containerPort.name}`);
+                                }
+                            } else {
+                                console.warn('容器端口状态获取失败:', containerPortStatesResult.data?.message);
+                                link.containerPortStates = {
+                                    admin_state: '获取失败',
+                                    link_state: '获取失败'
+                                };
+                            }
+                        }
+                    } catch (error) {
+                        console.error('获取容器端口状态失败:', error);
+                        link.containerPortStates = {
+                            admin_state: '连接错误',
+                            link_state: '连接错误'
+                        };
+                    }
+                    
+                    // 获取本机端口的接收统计（从传统端口统计）和发送统计（从流表统计）
+                    const localPortStatsResult = await callAPI(`/api/port-statistics/${link.localPort.bridge}`, 'POST', {
+                        sudo_password: document.getElementById('localSudoPassword').value
+                    });
+                    
+                    const localFlowStatsResult = await callAPI(`/api/flow-based-port-statistics/${link.localPort.bridge}`, 'POST', {
+                        sudo_password: document.getElementById('localSudoPassword').value
+                    });
+                    
+                    // 获取容器端口的接收统计（从传统端口统计）和发送统计（从流表统计）
+                    const containerPortStatsResult = await callAPI(`/api/container-port-statistics/${link.containerIP}/${link.containerPort.bridge}`, 'POST', {
+                        sudo_password: document.getElementById('containerSudoPassword').value
+                    });
+                    
+                    const containerFlowStatsResult = await callAPI(`/api/container-flow-based-port-statistics/${link.containerIP}/${link.containerPort.bridge}`, 'POST', {
+                        sudo_password: document.getElementById('containerSudoPassword').value
+                    });
+                    
+                    let localStats = { tx_bytes: 0, tx_packets: 0, rx_bytes: 0, rx_packets: 0 };
+                    let containerStats = { tx_bytes: 0, tx_packets: 0, rx_bytes: 0, rx_packets: 0 };
+                    
+                    // 解析本机统计：接收数据从端口统计，发送数据从流表统计
+                    if (localPortStatsResult.success && localPortStatsResult.data.status === 'success') {
+                        const portStats = localPortStatsResult.data.port_statistics.find(p => 
+                            p.port_number == link.localPort.number);
+                        if (portStats) {
+                            localStats.rx_bytes = portStats.rx_stats?.bytes || 0;
+                            localStats.rx_packets = portStats.rx_stats?.packets || 0;
+                        }
+                    }
+                    
+                    if (localFlowStatsResult.success && localFlowStatsResult.data.status === 'success') {
+                        const flowStats = localFlowStatsResult.data.port_output_statistics.find(p => 
+                            p.port_number == link.localPort.number || p.port_name === link.localPort.name);
+                        if (flowStats) {
+                            localStats.tx_bytes = flowStats.output_bytes || 0;
+                            localStats.tx_packets = flowStats.output_packets || 0;
+                        }
+                    }
+                    
+                    // 解析容器统计：接收数据从端口统计，发送数据从流表统计
+                    if (containerPortStatsResult.success && containerPortStatsResult.data.status === 'success') {
+                        const portStats = containerPortStatsResult.data.port_statistics.find(p => 
+                            p.port_number == link.containerPort.number);
+                        if (portStats) {
+                            containerStats.rx_bytes = portStats.rx_stats?.bytes || 0;
+                            containerStats.rx_packets = portStats.rx_stats?.packets || 0;
+                        }
+                    }
+                    
+                    if (containerFlowStatsResult.success && containerFlowStatsResult.data.status === 'success') {
+                        const flowStats = containerFlowStatsResult.data.port_output_statistics.find(p => 
+                            p.port_number == link.containerPort.number || p.port_name === link.containerPort.name);
+                        if (flowStats) {
+                            containerStats.tx_bytes = flowStats.output_bytes || 0;
+                            containerStats.tx_packets = flowStats.output_packets || 0;
+                        }
+                    }
+                    
+                    link.stats = {
+                        local: localStats,
+                        container: containerStats
+                    };
+                    link.lastUpdateTime = currentTime;
+                    
+                    // 计算5秒窗口内的丢包率（仅在有上一次数据时）
+                    if (previousStats && previousTime && previousStats.local && previousStats.container) {
+                        const timeDiff = (currentTime - previousTime) / 1000; // 转换为秒
+                        
+                        // 计算增量
+                        const localTxDiff = localStats.tx_packets - previousStats.local.tx_packets;
+                        const localRxDiff = localStats.rx_packets - previousStats.local.rx_packets;
+                        const containerTxDiff = containerStats.tx_packets - previousStats.container.tx_packets;
+                        const containerRxDiff = containerStats.rx_packets - previousStats.container.rx_packets;
+                        
+                        // 计算丢包率
+                        link.packetLossRate = calculatePacketLossRate(
+                            localTxDiff, containerRxDiff, 
+                            containerTxDiff, localRxDiff, 
+                            timeDiff
+                        );
+                    } else {
+                        // 首次统计，无法计算丢包率
+                        link.packetLossRate = {
+                            localToContainer: { rate: null, message: '等待下次统计...' },
+                            containerToLocal: { rate: null, message: '等待下次统计...' },
+                            timeDiff: 0
+                        };
+                    }
+                    
+                    // 异常检测（基于丢包率）
+                    link.anomaly = detectLinkAnomaly(link.packetLossRate);
+                    link.status = 'completed';
+                    
+                } catch (error) {
+                    link.status = 'error';
+                    link.packetLossRate = null;
+                    link.anomaly = {
+                        severity: 'error',
+                        message: `统计获取失败: ${error.message}`,
+                        hasPacketLoss: false
+                    };
+                }
+            }
+            
+            displayLinkConnections();
+        }
+        
+        // 计算丢包率
+        function calculatePacketLossRate(localTx, containerRx, containerTx, localRx, timeDiff) {
+            const result = {
+                localToContainer: { rate: null, lossPackets: 0, message: '' },
+                containerToLocal: { rate: null, lossPackets: 0, message: '' },
+                timeDiff: timeDiff
+            };
+            
+            // 计算本机→容器方向的丢包率
+            if (localTx > 0) {
+                const loss = Math.max(0, localTx - containerRx);
+                const rate = (loss / localTx) * 100;
+                result.localToContainer.rate = rate;
+                result.localToContainer.lossPackets = loss;
+                result.localToContainer.sentPackets = localTx;
+                result.localToContainer.receivedPackets = containerRx;
+                
+                if (rate >= 50) {
+                    result.localToContainer.message = `严重丢包 ${rate.toFixed(1)}%`;
+                } else if (rate >= 10) {
+                    result.localToContainer.message = `丢包 ${rate.toFixed(1)}%`;
+                } else if (rate > 0) {
+                    result.localToContainer.message = `轻微丢包 ${rate.toFixed(1)}%`;
+                } else {
+                    result.localToContainer.message = '正常';
+                }
+            } else {
+                result.localToContainer.message = '无发包';
+            }
+            
+            // 计算容器→本机方向的丢包率
+            if (containerTx > 0) {
+                const loss = Math.max(0, containerTx - localRx);
+                const rate = (loss / containerTx) * 100;
+                result.containerToLocal.rate = rate;
+                result.containerToLocal.lossPackets = loss;
+                result.containerToLocal.sentPackets = containerTx;
+                result.containerToLocal.receivedPackets = localRx;
+                
+                if (rate >= 50) {
+                    result.containerToLocal.message = `严重丢包 ${rate.toFixed(1)}%`;
+                } else if (rate >= 10) {
+                    result.containerToLocal.message = `丢包 ${rate.toFixed(1)}%`;
+                } else if (rate > 0) {
+                    result.containerToLocal.message = `轻微丢包 ${rate.toFixed(1)}%`;
+                } else {
+                    result.containerToLocal.message = '正常';
+                }
+            } else {
+                result.containerToLocal.message = '无发包';
+            }
+            
+            return result;
+        }
+        
+        // 启动链路监控
+        function startLinkMonitoring(linkId) {
+            // 如果已经存在定时器，先清除
+            stopLinkMonitoring(linkId);
+            
+            // 每5秒刷新一次统计
+            const intervalId = setInterval(() => {
+                refreshLinkStats(linkId);
+            }, 5000);
+            
+            linkMonitorIntervals[linkId] = intervalId;
+            console.log(`链路 ${linkId} 监控已启动，每5秒更新一次`);
+        }
+        
+        // 停止链路监控
+        function stopLinkMonitoring(linkId) {
+            if (linkMonitorIntervals[linkId]) {
+                clearInterval(linkMonitorIntervals[linkId]);
+                delete linkMonitorIntervals[linkId];
+                console.log(`链路 ${linkId} 监控已停止`);
+            }
+        }
+        
+        // 异常检测算法（基于丢包率对象）
+        function detectLinkAnomaly(packetLossRate) {
+            if (!packetLossRate) {
+                return null;
+            }
+            
+            const issues = [];
+            let hasPacketLoss = false;
+            let maxSeverity = null;
+            
+            // 检查本机→容器方向
+            if (packetLossRate.localToContainer.rate !== null) {
+                if (packetLossRate.localToContainer.rate >= 50) {
+                    issues.push(`本机→容器: ${packetLossRate.localToContainer.message}`);
+                    hasPacketLoss = true;
+                    maxSeverity = 'error';
+                } else if (packetLossRate.localToContainer.rate >= 10) {
+                    issues.push(`本机→容器: ${packetLossRate.localToContainer.message}`);
+                    hasPacketLoss = true;
+                    if (maxSeverity !== 'error') maxSeverity = 'warning';
+                }
+            }
+            
+            // 检查容器→本机方向
+            if (packetLossRate.containerToLocal.rate !== null) {
+                if (packetLossRate.containerToLocal.rate >= 50) {
+                    issues.push(`容器→本机: ${packetLossRate.containerToLocal.message}`);
+                    hasPacketLoss = true;
+                    maxSeverity = 'error';
+                } else if (packetLossRate.containerToLocal.rate >= 10) {
+                    issues.push(`容器→本机: ${packetLossRate.containerToLocal.message}`);
+                    hasPacketLoss = true;
+                    if (maxSeverity !== 'error') maxSeverity = 'warning';
+                }
+            }
+            
+            if (issues.length > 0) {
+                return {
+                    severity: maxSeverity || 'warning',
+                    message: issues.join('; '),
+                    hasPacketLoss: hasPacketLoss
+                };
+            }
+            
+            return null; // 无异常
+        }
+        
+        // 休眠链路功能
+        async function hibernateLink(linkId) {
+            const link = linkConnections.find(l => l.id === linkId);
+            if (!link) {
+                alert('链路不存在');
+                return;
+            }
+            
+            const confirmed = confirm(`确认要休眠链路 "${link.localPort.name} ↔ ${link.containerPort.name}" 吗？\n这将使用 'ip link set <端口> down' 命令设置两端端口为down状态。`);
+            if (!confirmed) {
+                return;
+            }
+            
+            // 停止监控
+            stopLinkMonitoring(linkId);
+            
+            try {
+                // 获取密码
+                const localPassword = document.getElementById('localSudoPassword').value;
+                const containerPassword = document.getElementById('containerSudoPassword').value;
+                
+                // 设置本机端口为down
+                const localResult = await callAPI('/api/set-port-down', 'POST', {
+                    bridge: link.localPort.bridge,
+                    port: link.localPort.name,
+                    sudo_password: localPassword
+                });
+                
+                // 设置容器端口为down
+                const containerResult = await callAPI(`/api/container-set-port-down/${link.containerIP}`, 'POST', {
+                    bridge: link.containerPort.bridge,
+                    port: link.containerPort.name,
+                    sudo_password: containerPassword
+                });
+                
+                let results = [];
+                if (localResult.success && localResult.data.status === 'success') {
+                    results.push(`本机端口已通过ip link set设置为down (${link.localPort.name})`);
+                } else {
+                    results.push(`本机端口设置失败: ${localResult.data?.message || localResult.error || '未知错误'}`);
+                }
+                
+                if (containerResult.success && containerResult.data.status === 'success') {
+                    results.push(`容器端口已通过ip link set设置为down (${link.containerPort.name})`);
+                } else {
+                    results.push(`容器端口设置失败: ${containerResult.data?.message || containerResult.error || '未知错误'}`);
+                }
+                
+                alert('休眠链路操作完成:\n' + results.join('\n') + '\n\n正在刷新端口状态信息...');
+                
+                // 如果至少有一端成功设置为down，标记链路为休眠状态
+                if ((localResult.success && localResult.data.status === 'success') || 
+                    (containerResult.success && containerResult.data.status === 'success')) {
+                    link.status = 'hibernated';
+                    link.anomaly = {
+                        severity: 'warning',
+                        message: '链路已休眠'
+                    };
+                }
+                
+                // 刷新所有相关信息
+                await refreshAllPortInfo();
+                await refreshLinkStats(linkId);
+                
+            } catch (error) {
+                alert('休眠链路操作失败: ' + error.message);
+            }
+        }
+        
+        // 恢复链路功能
+        async function wakeupLink(linkId) {
+            const link = linkConnections.find(l => l.id === linkId);
+            if (!link) {
+                alert('链路不存在');
+                return;
+            }
+            
+            const confirmed = confirm(`确认要恢复链路 "${link.localPort.name} ↔ ${link.containerPort.name}" 吗？\n这将设置两端端口为up状态。`);
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                // 获取密码
+                const localPassword = document.getElementById('localSudoPassword').value;
+                const containerPassword = document.getElementById('containerSudoPassword').value;
+                
+                // 设置本机端口为up
+                const localResult = await callAPI('/api/set-port-up', 'POST', {
+                    bridge: link.localPort.bridge,
+                    port: link.localPort.name,
+                    sudo_password: localPassword
+                });
+                
+                // 设置容器端口为up
+                const containerResult = await callAPI(`/api/container-set-port-up/${link.containerIP}`, 'POST', {
+                    bridge: link.containerPort.bridge,
+                    port: link.containerPort.name,
+                    sudo_password: containerPassword
+                });
+                
+                let results = [];
+                if (localResult.success && localResult.data.status === 'success') {
+                    results.push(`本机端口已恢复 (${localResult.data.method})`);
+                } else {
+                    results.push(`本机端口恢复失败: ${localResult.data?.message || localResult.error || '未知错误'}`);
+                }
+                
+                if (containerResult.success && containerResult.data.status === 'success') {
+                    results.push(`容器端口已恢复 (${containerResult.data.method})`);
+                } else {
+                    results.push(`容器端口恢复失败: ${containerResult.data?.message || containerResult.error || '未知错误'}`);
+                }
+                
+                alert('恢复链路操作完成:\n' + results.join('\n') + '\n\n正在刷新端口状态信息...');
+                
+                // 如果至少有一端成功设置为up，清除休眠状态并重启监控
+                if ((localResult.success && localResult.data.status === 'success') || 
+                    (containerResult.success && containerResult.data.status === 'success')) {
+                    link.status = 'completed';
+                    link.anomaly = null; // 清除异常状态
+                    
+                    // 重启监控
+                    startLinkMonitoring(linkId);
+                }
+                
+                // 刷新所有相关信息
+                await refreshAllPortInfo();
+                await refreshLinkStats(linkId);
+                
+            } catch (error) {
+                alert('恢复链路操作失败: ' + error.message);
+            }
+        }
+        
+        // 格式化字节数
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 刷新所有端口信息
+        async function refreshAllPortInfo() {
+            try {
+                // 刷新本机端口信息
+                console.log('刷新本机端口信息...');
+                const localPassword = document.getElementById('localSudoPassword').value;
+                await loadLocalBridgesAndPorts(localPassword);
+                
+                // 刷新容器端口信息（如果有容器IP）
+                const containerIP = document.getElementById('containerIP').value.trim();
+                if (containerIP && currentContainerIP === containerIP) {
+                    console.log('刷新容器端口信息...');
+                    await loadContainerBridgesAndPorts();
+                }
+                
+                console.log('所有端口信息刷新完成');
+            } catch (error) {
+                console.error('刷新端口信息时发生错误:', error);
+            }
+        }
+
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 页面加载时自动获取本机信息（不使用密码）
+            loadLocalBridgesAndPorts();
+            
+            // 按钮事件
+            document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+            document.getElementById('loadBridgesBtn').addEventListener('click', function() {
+                addSpinAnimation('loadBridgesBtn');
+                loadContainerBridgesAndPorts().finally(() => {
+                    removeSpinAnimation('loadBridgesBtn');
+                });
+            });
+            document.getElementById('refreshLocalBtn').addEventListener('click', function() {
+                addSpinAnimation('refreshLocalBtn');
+                refreshLocalBridges().finally(() => {
+                    removeSpinAnimation('refreshLocalBtn');
+                });
+            });
+            document.getElementById('refreshLinksBtn').addEventListener('click', async function() {
+                addSpinAnimation('refreshLinksBtn');
+                
+                // 显示刷新进度信息
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i>刷新中...';
+                
+                try {
+                    // 先刷新所有端口信息
+                    this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i>更新端口状态...';
+                    await refreshAllPortInfo();
+                    
+                    // 再刷新链路统计和异常检测
+                    if (linkConnections.length > 0) {
+                        this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i>检测链路异常...';
+                        await refreshLinkStats();
+                        
+                        // 统计异常情况
+                        const totalLinks = linkConnections.length;
+                        const errorLinks = linkConnections.filter(link => link.anomaly && link.anomaly.severity === 'error').length;
+                        const warningLinks = linkConnections.filter(link => link.anomaly && link.anomaly.severity === 'warning').length;
+                        const closedLinks = linkConnections.filter(link => {
+                            if (!link.localPortStates || !link.containerPortStates) return false;
+                            return (link.localPortStates.admin_state === 'down' || 
+                                   link.localPortStates.link_state === 'down' ||
+                                   link.containerPortStates.admin_state === 'down' || 
+                                   link.containerPortStates.link_state === 'down');
+                        }).length;
+                        
+                        // 显示刷新结果摘要
+                        let summaryMessage = `刷新完成 - 共${totalLinks}个链路`;
+                        if (errorLinks > 0) summaryMessage += `，${errorLinks}个异常`;
+                        if (warningLinks > 0) summaryMessage += `，${warningLinks}个警告`;
+                        if (closedLinks > 0) summaryMessage += `，${closedLinks}个关闭`;
+                        
+                        // 临时显示结果
+                        this.innerHTML = `<i class="fas fa-check me-1"></i>${summaryMessage}`;
+                        setTimeout(() => {
+                            this.innerHTML = originalText;
+                        }, 3000);
+                    } else {
+                        this.innerHTML = '<i class="fas fa-check me-1"></i>端口状态已更新';
+                        setTimeout(() => {
+                            this.innerHTML = originalText;
+                        }, 2000);
+                    }
+                    
+                } catch (error) {
+                    console.error('刷新统计时发生错误:', error);
+                    this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>刷新失败';
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                    }, 3000);
+                } finally {
+                    removeSpinAnimation('refreshLinksBtn');
+                }
+            });
+        });
+
+
+    </script>
+</body>
+</html>

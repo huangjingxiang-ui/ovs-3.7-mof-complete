@@ -1,0 +1,22 @@
+        @Override
+        public TrafficSelector.Builder extension(ExtensionSelector extensionSelector,
+                DeviceId deviceId) {
+            return add(Criteria.extension(extensionSelector, deviceId));
+        }
+
+        @Override
+        public DefaultTrafficSelector build() {
+            return new DefaultTrafficSelector(selector.values(), extSelector.values(), match);
+        }
+    }
+
+    public static DefaultTrafficSelector readFrom(ByteBuf bb){
+        DefaultTrafficSelector.Builder trafficSelector = DefaultTrafficSelector.builder();
+        HashMap<Criterion.Type, Criterion.Builder> builders = new HashMap<>();
+
+        Criterion.Builder builder = new PortCriterion.Builder();
+        if(builder.readMask(bb)){
+            builders.put(Criterion.Type.IN_PORT, builder);
+        }
+        bb.skipBytes(6);  
+

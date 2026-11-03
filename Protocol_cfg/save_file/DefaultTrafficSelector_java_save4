@@ -1,0 +1,9 @@
+        if(builders.containsKey(Criterion.Type.IN_PORT)){
+            trafficSelector.add(builders.get(Criterion.Type.IN_PORT)
+                                        .readData(bb)
+                                        .build());
+        }else{
+            bb.skipBytes(PortCriterion.LEN);
+        }
+        bb.skipBytes(6);
+

@@ -1,0 +1,26 @@
+
+========== Environment ==========
+Project       : /home/ovs/ovs-3.7-mof-complete
+OVS source    : /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof
+Build dir     : /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof
+DPDK          : 23.11.0
+Parallel jobs : 2
+
+========== Reuse existing configure result ==========
+Use --reconfigure if DPDK, compiler flags or paths have changed.
+
+========== Compile OVS 3.7-MOF ==========
+make: 进入目录“/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof”
+make  all-am
+make[1]: 进入目录“/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof”
+make[1]: 离开目录“/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof”
+make: 离开目录“/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof”
+
+========== Verify build result ==========
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+Build completed successfully.
+ovs-vswitchd: /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/vswitchd/ovs-vswitchd
+ovs-ofctl   : /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-ofctl
+Nothing was installed. Re-run with --install when installation is required.

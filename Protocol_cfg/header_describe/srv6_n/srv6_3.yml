@@ -1,0 +1,27 @@
+srv6_3 :
+  srv6_type : 
+    size : 8
+  srv6_hdr_ext_len : 
+    size : 8
+  srv6_routing_Type : 
+    size : 8
+  srv6_segments_left : 
+    size : 8 
+  srv6_last_enty : 
+    size : 8
+  srv6_flags : 
+    size : 8
+  srv6_tag :
+    size : 16
+  srv6_segmentlist1 : 
+    size : 128
+  srv6_segmentlist2 : 
+    size : 128
+  srv6_segmentlist3 : 
+    size : 128
+    
+  Type : 
+    srv6_TYPE_tcp : '0x06'
+    srv6_TYPE_udp : '0x11'
+
+

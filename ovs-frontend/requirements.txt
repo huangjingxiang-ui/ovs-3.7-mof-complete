@@ -1,0 +1,16 @@
+# Web Framework
+Flask==3.1.0
+
+# Configuration File Parsing
+PyYAML==6.0.2
+
+
+requests==2.31.0
+
+# Flask ecosystem dependencies (automatically installed with Flask)
+# blinker==1.9.0
+# click==8.1.8
+# itsdangerous==2.2.0
+# Jinja2==3.1.6
+# MarkupSafe==3.0.2
+# Werkzeug==3.1.3

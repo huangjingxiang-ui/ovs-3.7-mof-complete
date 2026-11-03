@@ -1,0 +1,12 @@
+vlan2 :
+   vlan2_tpid :
+     size : 16
+
+   vlan2_qid :
+     size : 16
+   
+   Type :
+     NULL
+
+
+   

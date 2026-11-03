@@ -1,0 +1,25 @@
+arp_e :
+    hw_e : 
+     size : 16
+    arp_e_type :
+     size : 16 
+    hw_len_e :
+     size : 8       
+    proto_len_e :
+     size : 8  
+    opcode_e :
+     size : 16      
+    src_mac_e :
+     size : 48   
+    src_ip_e :
+     size : 32     
+    dst_mac_e :
+      size : 48   
+    dst_ip_e :
+      size : 32
+    
+    Type : 
+
+    Hash :
+    - src_ip_e
+    - dst_ip_e

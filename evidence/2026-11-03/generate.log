@@ -1,0 +1,10 @@
+    SRV6_1 = 1 << 15,
+
+    SRV6_2 = 1 << 16,
+
+    SRV6_3 = 1 << 17,
+
+OVS 3.7-MOF sources generated in /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof
+Configuration successful!
+OVS 3.7-MOF target: /home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof
+Generated Java files: /home/ovs/ovs-3.7-mof-complete/Protocol_cfg/tmp_file_java

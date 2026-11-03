@@ -1,0 +1,535 @@
+# Ipv4_addr:该交换机的Ipv4地址
+# Ipv6_addr:该交换机的Ipv6地址
+# Mac_addr:该交换机的MAC地址
+
+# Port:该换机的所有端口，以及它们与Tap口之间的对应关系
+# Static_ARP,静态ARP配置，用于逐跳更新MAC地址
+
+# SID_Table：交换机的SID表（Table1的第一部分）
+# Not_Local：非本机IP网段（Table1的第二部分）
+# Table2-33:32个不同vlanID的VRF转发表
+# Table34:PE进入后不带VLAN的数据包要转入的table，用于给不带vlan的数据包添加srh头
+
+# Vlan：表示所有可能出现的VlanID，可自定义
+
+# GROUP:交换机的组表配置，包括组表的组ID和该组表的内容
+
+# ACTIONx:自定义的动作，可以在表项的动作中引用，类似C语言中的宏，便于部分较长的action的配置。
+
+# ----------------------------------- #
+# ip_daddr_e：表示外层ipv4的目的地址
+# ip_daddr_i：表示内层ipv4的目的地址
+# ipv6_dst_e：表示外层ipv6的目的地址
+# ipv6_dst_i：表示内层ipv6的目的地址
+
+Ipv4_addr: 20.0.0.2/24
+Ipv6_addr: C::2/32
+Mac_addr: FF:00:00:00:00:02
+
+Port:
+  s2_PE1: Tap-acc1
+  s2_P1 : Tap1
+  s2_P2 : Tap2
+
+Static_ARP:
+  s2_PE1: FF:00:00:00:00:0B
+  s2_P1: FF:00:00:00:00:01
+  s2_P2: FF:00:00:00:00:04
+
+
+SID_Table :
+  END: 
+    - "A2::1/32"
+    - "A7::1/32"
+    - "B9::2/32"
+  END.X: 
+    - "FF04::2/32": "group:1"
+    - "FF05::2/32": "group:1"
+    - "FF06::2/32": "group:1"
+    - "FF07::2/32": "group:1"
+  END.OP: 
+    - "FF08::3/32"
+    - "FF09::3/32"
+    - "FF0A::3/32"
+    - "FF0B::3/32"
+  END.DT4: 
+    - "FF0C::4/32"
+    - "FF0D::4/32"
+    - "FF0E::4/32"
+    - "FF0F::4/32"
+  END.DT6: 
+    - "FF10::5/32" 
+    - "FF11::5/32"
+    - "FF12::5/32"
+    - "FF13::5/32"
+  END.DX4: 
+    - "FF14::6/32": "group:2"
+    - "FF15::6/32": "group:2"
+    - "FF16::6/32": "group:2"
+    - "FF17::6/32": "group:2"
+  END.DX6: 
+    - "FF18::7/32": "group:3"
+    - "FF19::7/32": "group:3"
+    - "FF1A::7/32": "group:3"
+    - "FF1B::7/32": "group:3"
+
+# Not_Local:
+#   ip_daddr_e:
+#     "20.0.0.1/24": "group:11"
+#   ipv6_dst_e:
+#     "e::1/32": "group:12"
+
+Not_Local: "group:4"
+
+
+Table2:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table3:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table4:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table5:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table6:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table7:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table8:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table9:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table10:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table11:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table12:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table13:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table14:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table15:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table16:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table17:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table18:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table19:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table20:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table21:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table22:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table23:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table24:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table25:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table26:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table27:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table28:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table29:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table30:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table31:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table32:
+  ip_daddr_e: 
+    "10.0.1.2/24": "group:9"
+    "10.0.2.1/24": "group:8"
+    "10.0.3.1/24": "group:8"
+    "10.0.4.2/24": "group:7"
+  ipv6_dst_e:
+    "a001::2/32": "group:7"
+    "b001::1/32": "group:9"
+    "c002::1/32": "group:8"
+    "d003::1/32": "group:8"
+Table33:
+  ipv6_dst_e:
+    "A4::1":
+      - "group:5"
+    "D7::1":
+      - "group:7"
+    "C9::3":
+      - "group:8"
+
+Table34:
+  ip_daddr_e:
+    "10.0.1.1":
+      - ACTION1
+      - "group:6"
+    "10.0.2.1":
+      - "group:7"
+
+
+GROUP:
+  group1: "output:s2_P1"
+  group2: "output:s2_P1"
+  group3: "output:s2_P1"
+  group4: "output:s2_P1"
+  group5: "output:s2_P2"
+  group6: "output:s2_P2"
+  group7: "output:s2_P1"
+  group8: "output:s2_P1"
+  group9: "output:s2_P1"
+
+
+
+Vlan:
+  - 102
+  - 103
+  - 104
+  - 105
+  - 106
+  - 107
+  - 108
+  - 109
+  - 110
+  - 111
+  - 112
+  - 113
+  - 114
+  - 115
+  - 116
+  - 117
+  - 118
+  - 119
+  - 120
+  - 121
+  - 122
+  - 123
+  - 124
+  - 125
+  - 126
+  - 127
+  - 128
+  - 129
+  - 130
+  - 131
+  - 132 
+  - 133
+
+ACTION1: "move_protocol(dst=ipv4_i,src=ipv4_e), \\\n
+          del_protocol(udp), \\\n
+          mod_fields(dl, dl_type=0x86dd), \\\n
+          add_protocol(ipv6_e,ipv6_e_type=0x12, \\\n
+          ipv6_src_e=0x000C0000000000000000000000000002, \\\n
+          ipv6_dst_e=0x00B40000000000000000000000000001), \\\n
+          add_protocol(srv6_3,srv6_type=41,srv6_hdr_ext_len=56,srv6_segments_left=2, \\\n
+          srv6_segmentlist1=0x00B50000000000000000000000000001, \\\n
+          srv6_segmentlist2=0x00B30000000000000000000000000001, \\\n
+          srv6_segmentlist3=0x00B40000000000000000000000000001)"
+
+
+  # Vlan:
+#   - 2
+#   - 3
+#   - 4
+#   - 5
+#   - 6
+#   - 7
+#   - 8
+#   - 9
+#   - 10
+#   - 11
+#   - 12
+#   - 13
+#   - 14
+#   - 15
+#   - 16
+#   - 17
+#   - 18
+#   - 19
+#   - 20
+#   - 21
+#   - 22
+#   - 23
+#   - 24
+#   - 25
+#   - 26
+#   - 27
+#   - 28
+#   - 29
+#   - 30
+#   - 31
+#   - 32 
+#   - 33

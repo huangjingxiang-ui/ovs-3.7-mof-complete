@@ -1,0 +1,10 @@
+sr_mpls_3 :
+  lse_3 : 
+    size : 24
+  ttl_3 : 
+    size : 8
+    
+  Type : 
+
+  Hash :
+    - lse_3

@@ -1,0 +1,20 @@
+--- a/ofproto/ofproto.c
++++ b/ofproto/ofproto.c
+@@ -5761,11 +5761,17 @@ ofproto_rule_create_mof(struct ofproto *ofproto, struct cls_rule *cr,
+     struct rule *rule;
+     enum ofperr error;
+ 
++    /* Rule destruction drops this reference, as for native OVS rules. */
++    if (!ofproto_try_ref(ofproto)) {
++        return OFPERR_OFPFMFC_UNKNOWN;
++    }
++
+     /* Allocate new rule. */
+     VLOG_INFO("ofproto_rule_create_mof: error1?");
+     rule = ofproto->ofproto_class->rule_alloc();
+     if (!rule) {
+         cls_rule_destroy(cr);
++        ofproto_unref(ofproto);
+         VLOG_WARN_RL(&rl, "%s: failed to allocate a rule.", ofproto->name);
+         return OFPERR_OFPFMFC_UNKNOWN;
+     }

@@ -1,0 +1,23 @@
+name: ModMacIp
+actions:
+- type: mod_fields
+  protocol: mac
+  params:
+    mac_src: '9876'
+- type: del_protocol
+  protocol: ipv4_e
+- type: add_protocol
+  protocol: ipv6_e
+  params:
+    ipv6_dst_e: 2001:0db8::2
+    ipv6_e_type: '0x6'
+    ipv6_hlmt_e: '0x64'
+    ipv6_plen_e: '0x001a'
+    ipv6_src_e: 2001:0db8::1
+    ipv6_ver_tp_flb_e: '0x60000000'
+- type: mod_fields
+  protocol: dl
+  params:
+    dl_type: '0x86DD'
+- type: output
+  parameter: h2_1

@@ -1,0 +1,10 @@
+sr_mpls_4 :
+  lse_4 : 
+    size : 24
+  ttl_4 : 
+    size : 8
+    
+  Type : 
+
+  Hash :
+    - lse_4

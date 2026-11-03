@@ -1,0 +1,23 @@
+tcp :
+  tcp_source : 
+    size : 16
+  tcp_dest : 
+    size : 16
+  seq : 
+    size : 32
+  ack_seq : 
+    size : 32
+  off_bits:
+    size : 16
+  window:
+    size : 16
+  tcp_check:
+    size : 16
+  urg_ptr:
+    size : 16
+  
+  Type : 
+
+  Hash :
+    - tcp_source
+    - tcp_dest

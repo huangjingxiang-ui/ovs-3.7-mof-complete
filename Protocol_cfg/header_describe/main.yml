@@ -1,0 +1,25 @@
+Layer2:
+ - mac
+Layer2_5:
+ - vlan1
+ - vlan2
+Layer2_e:
+ - dl
+Layer3:
+ - sr_mpls_1
+ - sr_mpls_2
+ - sr_mpls_3
+ - sr_mpls_4
+ - sr_mpls_5
+ - arp_e
+ - ipv4_e
+ - ipv6_e
+Layer4:
+ - tcp
+ - udp
+ - icmpv6
+ - srv6
+
+Specific:
+  srv6: '0x12'
+

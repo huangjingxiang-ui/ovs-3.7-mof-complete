@@ -1,0 +1,872 @@
+/*
+ * Copyright (c) 2008-2017, 2019-2020 Nicira, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <config.h>
+
+#include <sys/types.h>
+#include <netinet/in.h>
+
+#include "bundle.h"
+#include "byte-order.h"
+#include "colors.h"
+#include "compiler.h"
+#include "dummy.h"
+#include "openvswitch/hmap.h"
+#include "learn.h"
+#include "multipath.h"
+#include "nx-match.h"
+#include "odp-netlink.h"
+#include "openvswitch/dynamic-string.h"
+#include "openvswitch/meta-flow.h"
+#include "openvswitch/ofp-actions.h"
+#include "openvswitch/ofp-packet.h"
+#include "openvswitch/ofp-parse.h"
+#include "openvswitch/ofp-port.h"
+#include "openvswitch/ofp-prop.h"
+#include "openvswitch/ofp-table.h"
+#include "openvswitch/ofpbuf.h"
+#include "openvswitch/vlog.h"
+#include "unaligned.h"
+#include "util.h"
+#include "vl-mff-map.h"
+
+//////////////////////////////////////
+
+// 添加引用：
+#include <dirent.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+//////////////////////////////////////
+
+VLOG_DEFINE_THIS_MODULE(ofp_actions);
+
+static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+
+struct ofp_action_header;
+
+extern size_t crc_ofs[];
+
+/* Header for Open vSwitch and ONF vendor extension actions.
+ *
+ * This is the entire header for a few Open vSwitch vendor extension actions,
+ * the ones that either have no arguments or for which variable-length
+ * arguments follow the header.
+ *
+ * This cannot be used as an entirely generic vendor extension action header,
+ * because OpenFlow does not specify the location or size of the action
+ * subtype; it just happens that ONF extensions and Nicira extensions share
+ * this format. */
+struct ext_action_header {
+    ovs_be16 type;                  /* OFPAT_VENDOR. */
+    ovs_be16 len;                   /* At least 16. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID or ONF_VENDOR_ID. */
+    ovs_be16 subtype;               /* See enum ofp_raw_action_type. */
+    uint8_t pad[6];
+};
+OFP_ASSERT(sizeof(struct ext_action_header) == 16);
+
+/* Raw identifiers for OpenFlow actions.
+ *
+ * Decoding and encoding OpenFlow actions across multiple versions is difficult
+ * to do in a clean, consistent way.  This enumeration lays out all of the
+ * forms of actions that Open vSwitch supports.
+ *
+ * The comments here must follow a stylized form because the
+ * "extract-ofp-actions" program parses them at build time to generate data
+ * tables.
+ *
+ *   - The first part of each comment specifies the vendor, OpenFlow versions,
+ *     and type for each protocol that supports the action:
+ *
+ *         # The vendor is OF for standard OpenFlow actions, NX for Nicira
+ *           extension actions.  (Support for other vendors can be added, but
+ *           it can't be done just based on a vendor ID definition alone
+ *           because OpenFlow doesn't define a standard way to specify a
+ *           subtype for vendor actions, so other vendors might do it different
+ *           from Nicira.)
+ *
+ *         # The version can specify a specific OpenFlow version, a version
+ *           range delimited by "-", or an open-ended range with "+".
+ *
+ *         # The type, in parentheses, is the action type number (for standard
+ *           OpenFlow actions) or subtype (for vendor extension actions).
+ *
+ *         # Optionally one may add "is deprecated" followed by a
+ *           human-readable reason in parentheses (which will be used in log
+ *           messages), if a particular action should no longer be used.
+ *
+ *     Multiple such specifications may be separated by commas.
+ *
+ *   - The second part describes the action's wire format.  It may be:
+ *
+ *         # "struct <name>": The struct fully specifies the wire format.  The
+ *           action is exactly the size of the struct.  (Thus, the struct must
+ *           be an exact multiple of 8 bytes in size.)
+ *
+ *         # "struct <name>, ...": The struct specifies the beginning of the
+ *           wire format.  An instance of the action is either the struct's
+ *           exact size, or a multiple of 8 bytes longer.
+ *
+ *         # "uint<N>_t" or "ovs_be<N>": The action consists of a (standard or
+ *           vendor extension) header, followed by 0 or more pad bytes to align
+ *           to a multiple of <N> bits, followed by an argument of the given
+ *           type, followed by 0 or more pad bytes to bring the total action up
+ *           to a multiple of 8 bytes.
+ *
+ *         # "void": The action is just a (standard or vendor extension)
+ *           header.
+ *
+ *         # Optionally, one may add "VLMFF" in the end of the second part if
+ *           the Openflow action may use a variable length meta-flow field
+ *           (i.e. tun_metadata). Adding "VLMFF" will pass the per-switch based
+ *           variable length meta-flow field mapping map (struct vl_mff_map) to
+ *           the corresponding action decoding function.
+ *
+ *   - Optional additional text enclosed in square brackets is commentary for
+ *     the human reader.
+ */
+enum ofp_raw_action_type {
+/* ## ----------------- ## */
+/* ## Standard actions. ## */
+/* ## ----------------- ## */
+
+    /* OF1.0(0): struct ofp10_action_output. */
+    OFPAT_RAW10_OUTPUT,
+    /* OF1.1+(0): struct ofp11_action_output. */
+    OFPAT_RAW11_OUTPUT,
+
+    /* OF1.0(1): uint16_t. */
+    OFPAT_RAW10_SET_VLAN_VID,
+    /* OF1.0(2): uint8_t. */
+    OFPAT_RAW10_SET_VLAN_PCP,
+
+    /* OF1.1(1), OF1.2+(1) is deprecated (use Set-Field): uint16_t.
+     *
+     * [Semantics differ slightly between the 1.0 and 1.1 versions of the VLAN
+     * modification actions: the 1.0 versions push a VLAN header if none is
+     * present, but the 1.1 versions do not.  That is the only reason that we
+     * distinguish their raw action types.] */
+    OFPAT_RAW11_SET_VLAN_VID,
+    /* OF1.1(2), OF1.2+(2) is deprecated (use Set-Field): uint8_t. */
+    OFPAT_RAW11_SET_VLAN_PCP,
+
+    /* OF1.1+(17): ovs_be16.
+     *
+     * [The argument is the Ethertype, e.g. ETH_TYPE_VLAN_8021Q, not the VID or
+     * TCI.] */
+    OFPAT_RAW11_PUSH_VLAN,
+
+    /* OF1.0(3): void. */
+    OFPAT_RAW10_STRIP_VLAN,
+    /* OF1.1+(18): void. */
+    OFPAT_RAW11_POP_VLAN,
+
+    /* OF1.0(4), OF1.1(3), OF1.2+(3) is deprecated (use Set-Field): struct
+     * ofp_action_dl_addr. */
+    OFPAT_RAW_SET_DL_SRC,
+
+    /* OF1.0(5), OF1.1(4), OF1.2+(4) is deprecated (use Set-Field): struct
+     * ofp_action_dl_addr. */
+    OFPAT_RAW_SET_DL_DST,
+
+    /* OF1.0(6), OF1.1(5), OF1.2+(5) is deprecated (use Set-Field):
+     * ovs_be32. */
+    OFPAT_RAW_SET_NW_SRC,
+
+    /* OF1.0(7), OF1.1(6), OF1.2+(6) is deprecated (use Set-Field):
+     * ovs_be32. */
+    OFPAT_RAW_SET_NW_DST,
+
+    /* OF1.0(8), OF1.1(7), OF1.2+(7) is deprecated (use Set-Field): uint8_t. */
+    OFPAT_RAW_SET_NW_TOS,
+
+    /* OF1.1(8), OF1.2+(8) is deprecated (use Set-Field): uint8_t. */
+    OFPAT_RAW11_SET_NW_ECN,
+
+    /* OF1.0(9), OF1.1(9), OF1.2+(9) is deprecated (use Set-Field):
+     * ovs_be16. */
+    OFPAT_RAW_SET_TP_SRC,
+
+    /* OF1.0(10), OF1.1(10), OF1.2+(10) is deprecated (use Set-Field):
+     * ovs_be16. */
+    OFPAT_RAW_SET_TP_DST,
+
+    /* OF1.0(11): struct ofp10_action_enqueue. */
+    OFPAT_RAW10_ENQUEUE,
+
+    /* NX1.0(30), OF1.1(13), OF1.2+(13) is deprecated (use Set-Field):
+     * ovs_be32. */
+    OFPAT_RAW_SET_MPLS_LABEL,
+
+    /* NX1.0(31), OF1.1(14), OF1.2+(14) is deprecated (use Set-Field):
+     * uint8_t. */
+    OFPAT_RAW_SET_MPLS_TC,
+
+    /* NX1.0(25), OF1.1(15), OF1.2+(15) is deprecated (use Set-Field):
+     * uint8_t. */
+    OFPAT_RAW_SET_MPLS_TTL,
+
+    /* NX1.0(26), OF1.1+(16): void. */
+    OFPAT_RAW_DEC_MPLS_TTL,
+
+    /* NX1.0(23), OF1.1+(19): ovs_be16.
+     *
+     * [The argument is the Ethertype, e.g. ETH_TYPE_MPLS, not the label.] */
+    OFPAT_RAW_PUSH_MPLS,
+
+    /* NX1.0(24), OF1.1+(20): ovs_be16.
+     *
+     * [The argument is the Ethertype, e.g. ETH_TYPE_IPV4 if at BoS or
+     * ETH_TYPE_MPLS otherwise, not the label.] */
+    OFPAT_RAW_POP_MPLS,
+
+    /* NX1.0(4), OF1.1+(21): uint32_t. */
+    OFPAT_RAW_SET_QUEUE,
+
+    /* NX1.0(40), OF1.1+(22): uint32_t. */
+    OFPAT_RAW_GROUP,
+
+    /* OF1.1+(23): uint8_t. */
+    OFPAT_RAW11_SET_NW_TTL,
+
+    /* NX1.0(18), OF1.1+(24): void. */
+    OFPAT_RAW_DEC_NW_TTL,
+    /* NX1.0+(21): struct nx_action_cnt_ids, ... */
+    NXAST_RAW_DEC_TTL_CNT_IDS,
+
+    /* OF1.2-1.4(25): struct ofp12_action_set_field, ... VLMFF */
+    OFPAT_RAW12_SET_FIELD,
+    /* OF1.5+(25): struct ofp12_action_set_field, ... VLMFF */
+    OFPAT_RAW15_SET_FIELD,
+    /* NX1.0-1.4(7): struct nx_action_reg_load. VLMFF
+     *
+     * [In OpenFlow 1.5, set_field is a superset of reg_load functionality, so
+     * we drop reg_load.] */
+    NXAST_RAW_REG_LOAD,
+    /* NX1.0-1.4(33): struct ext_action_header, ... VLMFF
+     *
+     * [In OpenFlow 1.5, set_field is a superset of reg_load2 functionality, so
+     * we drop reg_load2.] */
+    NXAST_RAW_REG_LOAD2,
+
+    /* OF1.5+(28): struct ofp15_action_copy_field, ... VLMFF */
+    OFPAT_RAW15_COPY_FIELD,
+    /* ONF1.3-1.4(3200): struct onf_action_copy_field, ... VLMFF */
+    ONFACT_RAW13_COPY_FIELD,
+    /* NX1.0-1.4(6): struct nx_action_reg_move, ... VLMFF */
+    NXAST_RAW_REG_MOVE,
+
+    /* OF1.5+(29): uint32_t. */
+    OFPAT_RAW15_METER,
+
+/* ## ------------------------- ## */
+/* ## Nicira extension actions. ## */
+/* ## ------------------------- ## */
+
+/* Actions similar to standard actions are listed with the standard actions. */
+
+    /* NX1.0+(1): uint16_t. */
+    NXAST_RAW_RESUBMIT,
+    /* NX1.0+(14): struct nx_action_resubmit. */
+    NXAST_RAW_RESUBMIT_TABLE,
+    /* NX1.0+(44): struct nx_action_resubmit. */
+    NXAST_RAW_RESUBMIT_TABLE_CT,
+
+    /* NX1.0+(2): uint32_t. */
+    NXAST_RAW_SET_TUNNEL,
+    /* NX1.0+(9): uint64_t. */
+    NXAST_RAW_SET_TUNNEL64,
+
+    /* NX1.0+(5): void. */
+    NXAST_RAW_POP_QUEUE,
+
+    /* NX1.0+(8): struct nx_action_note, ... */
+    NXAST_RAW_NOTE,
+
+    /* NX1.0+(10): struct nx_action_multipath. VLMFF */
+    NXAST_RAW_MULTIPATH,
+
+    /* NX1.0+(12): struct nx_action_bundle, ... */
+    NXAST_RAW_BUNDLE,
+    /* NX1.0+(13): struct nx_action_bundle, ... VLMFF */
+    NXAST_RAW_BUNDLE_LOAD,
+
+    /* NX1.0+(15): struct nx_action_output_reg. VLMFF */
+    NXAST_RAW_OUTPUT_REG,
+    /* NX1.0+(32): struct nx_action_output_reg2. VLMFF */
+    NXAST_RAW_OUTPUT_REG2,
+
+    /* NX1.0+(16): struct nx_action_learn, ... VLMFF */
+    NXAST_RAW_LEARN,
+    /* NX1.0+(45): struct nx_action_learn2, ... VLMFF */
+    NXAST_RAW_LEARN2,
+
+    /* NX1.0+(17): void. */
+    NXAST_RAW_EXIT,
+
+    /* NX1.0+(19): struct nx_action_fin_timeout. */
+    NXAST_RAW_FIN_TIMEOUT,
+
+    /* NX1.0+(20): struct nx_action_controller. */
+    NXAST_RAW_CONTROLLER,
+    /* NX1.0+(37): struct ext_action_header, ... */
+    NXAST_RAW_CONTROLLER2,
+
+    /* NX1.0+(22): struct nx_action_write_metadata. */
+    NXAST_RAW_WRITE_METADATA,
+
+    /* NX1.0+(27): struct nx_action_stack. VLMFF */
+    NXAST_RAW_STACK_PUSH,
+
+    /* NX1.0+(28): struct nx_action_stack. VLMFF */
+    NXAST_RAW_STACK_POP,
+
+    /* NX1.0+(29): struct nx_action_sample. */
+    NXAST_RAW_SAMPLE,
+    /* NX1.0+(38): struct nx_action_sample2. */
+    NXAST_RAW_SAMPLE2,
+    /* NX1.0+(41): struct nx_action_sample2. */
+    NXAST_RAW_SAMPLE3,
+
+    /* NX1.0+(34): struct nx_action_conjunction. */
+    NXAST_RAW_CONJUNCTION,
+
+    /* NX1.0+(35): struct nx_action_conntrack, ... VLMFF */
+    NXAST_RAW_CT,
+
+    /* NX1.0+(36): struct nx_action_nat, ... */
+    NXAST_RAW_NAT,
+
+    /* NX1.0+(39): struct nx_action_output_trunc. */
+    NXAST_RAW_OUTPUT_TRUNC,
+
+    /* NX1.0+(42): struct ext_action_header, ... VLMFF */
+    NXAST_RAW_CLONE,
+
+    /* NX1.0+(43): void. */
+    NXAST_RAW_CT_CLEAR,
+
+    /* NX1.3+(46): struct nx_action_encap, ... */
+    NXAST_RAW_ENCAP,
+
+    /* NX1.3+(47): struct nx_action_decap, ... */
+    NXAST_RAW_DECAP,
+
+    /* NX1.3+(48): void. */
+    NXAST_RAW_DEC_NSH_TTL,
+
+    /* NX1.0+(49): struct nx_action_check_pkt_larger, ... VLMFF */
+    NXAST_RAW_CHECK_PKT_LARGER,
+
+    /* NX1.0+(50): struct nx_action_delete_field. VLMFF */
+    NXAST_RAW_DELETE_FIELD,
+
+/* ## ------------------ ## */
+/* ## Debugging actions. ## */
+/* ## ------------------ ## */
+
+/* These are intentionally undocumented, subject to change, and ovs-vswitchd */
+/* accepts them only if started with --enable-dummy. */
+
+    /* NX1.0+(254): void. */
+    NXAST_RAW_DEBUG_SLOW,
+
+    /* NX1.0+(255): void. */
+    NXAST_RAW_DEBUG_RECIRC,
+};
+
+/* OpenFlow actions are always a multiple of 8 bytes in length. */
+#define OFP_ACTION_ALIGN 8
+
+/* Define a few functions for working with instructions. */
+#define DEFINE_INST(ENUM, STRUCT, EXTENSIBLE, NAME)             \
+    static inline const struct STRUCT * OVS_UNUSED              \
+    instruction_get_##ENUM(const struct ofp11_instruction *inst)\
+    {                                                           \
+        ovs_assert(inst->type == htons(ENUM));                  \
+        return ALIGNED_CAST(struct STRUCT *, inst);             \
+    }                                                           \
+                                                                \
+    static inline void OVS_UNUSED                               \
+    instruction_init_##ENUM(struct STRUCT *s)                   \
+    {                                                           \
+        memset(s, 0, sizeof *s);                                \
+        s->type = htons(ENUM);                                  \
+        s->len = htons(sizeof *s);                              \
+    }                                                           \
+                                                                \
+    static inline struct STRUCT * OVS_UNUSED                    \
+    instruction_put_##ENUM(struct ofpbuf *buf)                  \
+    {                                                           \
+        struct STRUCT *s = ofpbuf_put_uninit(buf, sizeof *s);   \
+        instruction_init_##ENUM(s);                             \
+        return s;                                               \
+    }
+OVS_INSTRUCTIONS
+#undef DEFINE_INST
+
+static void ofpacts_update_instruction_actions(struct ofpbuf *openflow,
+                                               size_t ofs);
+static void pad_ofpat(struct ofpbuf *openflow, size_t start_ofs);
+
+static enum ofperr ofpacts_verify(const struct ofpact[], size_t ofpacts_len,
+                                  enum ofp_version, uint32_t allowed_ovsinsts,
+                                  enum ofpact_type outer_action,
+                                  char **errorp);
+
+static void put_set_field(struct ofpbuf *openflow, enum ofp_version,
+                          enum mf_field_id, uint64_t value);
+
+static void put_reg_load(struct ofpbuf *openflow,
+                         const struct mf_subfield *, uint64_t value);
+
+static enum ofperr ofpact_pull_raw(struct ofpbuf *, enum ofp_version,
+                                   enum ofp_raw_action_type *, uint64_t *arg);
+static void *ofpact_put_raw(struct ofpbuf *, enum ofp_version,
+                            enum ofp_raw_action_type, uint64_t arg);
+
+static char *OVS_WARN_UNUSED_RESULT ofpacts_parse(
+    char *str, const struct ofpact_parse_params *pp,
+    bool allow_instructions, enum ofpact_type outer_action);
+static enum ofperr ofpacts_pull_openflow_actions__(
+    struct ofpbuf *openflow, unsigned int actions_len,
+    enum ofp_version version, uint32_t allowed_ovsinsts,
+    struct ofpbuf *ofpacts, enum ofpact_type outer_action,
+    const struct vl_mff_map *vl_mff_map, uint64_t *ofpacts_tlv_bitmap);
+static char * OVS_WARN_UNUSED_RESULT ofpacts_parse_copy(
+    const char *s_, const struct ofpact_parse_params *pp,
+    bool allow_instructions, enum ofpact_type outer_action);
+
+static void inconsistent_match(enum ofputil_protocol *usable_protocols);
+
+/* Returns the ofpact following 'ofpact', except that if 'ofpact' contains
+ * nested ofpacts it returns the first one. */
+struct ofpact *
+ofpact_next_flattened(const struct ofpact *ofpact)
+{
+    switch (ofpact->type) {
+    case OFPACT_OUTPUT:
+    case OFPACT_GROUP:
+    case OFPACT_CONTROLLER:
+    case OFPACT_ENQUEUE:
+    case OFPACT_OUTPUT_REG:
+    case OFPACT_OUTPUT_TRUNC:
+    case OFPACT_BUNDLE:
+    case OFPACT_SET_FIELD:
+    case OFPACT_SET_VLAN_VID:
+    case OFPACT_SET_VLAN_PCP:
+    case OFPACT_STRIP_VLAN:
+    case OFPACT_PUSH_VLAN:
+    case OFPACT_SET_ETH_SRC:
+    case OFPACT_SET_ETH_DST:
+    case OFPACT_SET_IPV4_SRC:
+    case OFPACT_SET_IPV4_DST:
+    case OFPACT_SET_IP_DSCP:
+    case OFPACT_SET_IP_ECN:
+    case OFPACT_SET_IP_TTL:
+    case OFPACT_SET_L4_SRC_PORT:
+    case OFPACT_SET_L4_DST_PORT:
+    case OFPACT_REG_MOVE:
+    case OFPACT_STACK_PUSH:
+    case OFPACT_STACK_POP:
+    case OFPACT_DEC_TTL:
+    case OFPACT_SET_MPLS_LABEL:
+    case OFPACT_SET_MPLS_TC:
+    case OFPACT_SET_MPLS_TTL:
+    case OFPACT_DEC_MPLS_TTL:
+    case OFPACT_PUSH_MPLS:
+    case OFPACT_POP_MPLS:
+    case OFPACT_SET_TUNNEL:
+    case OFPACT_SET_QUEUE:
+    case OFPACT_POP_QUEUE:
+    case OFPACT_FIN_TIMEOUT:
+    case OFPACT_RESUBMIT:
+    case OFPACT_LEARN:
+    case OFPACT_CONJUNCTION:
+    case OFPACT_MULTIPATH:
+    case OFPACT_NOTE:
+    case OFPACT_EXIT:
+    case OFPACT_SAMPLE:
+    case OFPACT_UNROLL_XLATE:
+    case OFPACT_CT_CLEAR:
+    case OFPACT_DEBUG_RECIRC:
+    case OFPACT_DEBUG_SLOW:
+    case OFPACT_METER:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_METADATA:
+    case OFPACT_GOTO_TABLE:
+    case OFPACT_NAT:
+    case OFPACT_ENCAP:
+    case OFPACT_DECAP:
+    case OFPACT_DEC_NSH_TTL:
+    case OFPACT_CHECK_PKT_LARGER:
+    case OFPACT_DELETE_FIELD:
+        return ofpact_next(ofpact);
+
+    case OFPACT_CLONE:
+        return ofpact_get_CLONE(ofpact)->actions;
+
+    case OFPACT_CT:
+        return ofpact_get_CT(ofpact)->actions;
+
+    case OFPACT_WRITE_ACTIONS:
+        return ofpact_get_WRITE_ACTIONS(ofpact)->actions;
+    }
+
+    OVS_NOT_REACHED();
+}
+
+/* Pull off existing actions or instructions. Used by nesting actions to keep
+ * ofpacts_parse() oblivious of actions nesting.
+ *
+ * Push the actions back on after nested parsing, e.g.:
+ *
+ *     size_t ofs = ofpacts_pull(ofpacts);
+ *     ...nested parsing...
+ *     ofpbuf_push_uninit(ofpacts, ofs);
+ */
+static size_t
+ofpacts_pull(struct ofpbuf *ofpacts)
+{
+    size_t ofs;
+
+    ofs = ofpacts->size;
+    ofpbuf_pull(ofpacts, ofs);
+
+    return ofs;
+}
+
+#include "ofp-actions.inc1"
+
+/* Output actions. */
+
+/* Action structure for OFPAT10_OUTPUT, which sends packets out 'port'.
+ * When the 'port' is the OFPP_CONTROLLER, 'max_len' indicates the max
+ * number of bytes to send.  A 'max_len' of zero means no bytes of the
+ * packet should be sent. */
+struct ofp10_action_output {
+    ovs_be16 type;                  /* OFPAT10_OUTPUT. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be16 port;                  /* Output port. */
+    ovs_be16 max_len;               /* Max length to send to controller. */
+};
+OFP_ASSERT(sizeof(struct ofp10_action_output) == 8);
+
+/* Action structure for OFPAT_OUTPUT, which sends packets out 'port'.
+   * When the 'port' is the OFPP_CONTROLLER, 'max_len' indicates the max
+   * number of bytes to send. A 'max_len' of zero means no bytes of the
+   * packet should be sent.*/
+struct ofp11_action_output {
+    ovs_be16 type;                    /* OFPAT11_OUTPUT. */
+    ovs_be16 len;                     /* Length is 16. */
+    ovs_be32 port;                    /* Output port. */
+    ovs_be16 max_len;                 /* Max length to send to controller. */
+    uint8_t pad[6];                   /* Pad to 64 bits. */
+};
+OFP_ASSERT(sizeof(struct ofp11_action_output) == 16);
+
+static enum ofperr
+decode_OFPAT_RAW10_OUTPUT(const struct ofp10_action_output *oao,
+                          enum ofp_version ofp_version OVS_UNUSED,
+                          struct ofpbuf *out)
+{
+    struct ofpact_output *output;
+
+    output = ofpact_put_OUTPUT(out);
+    output->port = u16_to_ofp(ntohs(oao->port));
+    output->max_len = ntohs(oao->max_len);
+
+    return ofpact_check_output_port(output->port, OFPP_MAX);
+}
+
+static enum ofperr
+decode_OFPAT_RAW11_OUTPUT(const struct ofp11_action_output *oao,
+                          enum ofp_version ofp_version OVS_UNUSED,
+                          struct ofpbuf *out)
+{
+    struct ofpact_output *output;
+    enum ofperr error;
+
+    output = ofpact_put_OUTPUT(out);
+    output->max_len = ntohs(oao->max_len);
+
+    error = ofputil_port_from_ofp11(oao->port, &output->port);
+    if (error) {
+        return error;
+    }
+
+    return ofpact_check_output_port(output->port, OFPP_MAX);
+}
+
+static void
+encode_OUTPUT(const struct ofpact_output *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+    if (ofp_version == OFP10_VERSION) {
+        struct ofp10_action_output *oao;
+
+        oao = put_OFPAT10_OUTPUT(out);
+        oao->port = htons(ofp_to_u16(output->port));
+        oao->max_len = htons(output->max_len);
+    } else {
+        struct ofp11_action_output *oao;
+
+        oao = put_OFPAT11_OUTPUT(out);
+        oao->port = ofputil_port_to_ofp11(output->port);
+        oao->max_len = htons(output->max_len);
+    }
+}
+
+static void
+encode_ADD_PROTOCOL(const struct ofpact_add_protocol *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+    
+}
+
+static void
+encode_DEL_PROTOCOL(const struct ofpact_del_protocol *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+    
+}
+
+static void 
+encode_MOD_FIELDS(const struct ofpact_mod_fields *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_CHECK_CRC(const struct ofpact_check_crc *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_CALC_CRC(const struct ofpact_check_crc *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_PAYLOAD_CRC(const struct ofpact_payload_crc *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_SEG_ROUTING(const struct ofpact_null *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_ADD_BYTES(const struct ofpact_add_bytes *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_IPV42IPV6(const struct ofpact_null *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_IPV62IPV4(const struct ofpact_null *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_IPV4_CHECKSUM(const struct ofpact_null *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static void 
+encode_MOVE_PROTOCOL(const struct ofpact_move_protocol *output,
+              enum ofp_version ofp_version, struct ofpbuf *out)
+{
+
+}
+
+static char * OVS_WARN_UNUSED_RESULT
+parse_truncate_subfield(const char *arg_,
+                        const struct ofpact_parse_params *pp,
+                        struct ofpact_output_trunc *output_trunc)
+{
+    char *key, *value;
+    char *arg = CONST_CAST(char *, arg_);
+
+    while (ofputil_parse_key_value(&arg, &key, &value)) {
+        if (!strcmp(key, "port")) {
+            if (!ofputil_port_from_string(value, pp->port_map,
+                                          &output_trunc->port)) {
+                return xasprintf("output to unknown truncate port: %s",
+                                  value);
+            }
+            if (ofp_to_u16(output_trunc->port) > ofp_to_u16(OFPP_MAX)) {
+                if (output_trunc->port != OFPP_LOCAL &&
+                    output_trunc->port != OFPP_IN_PORT)
+                return xasprintf("output to unsupported truncate port: %s",
+                                 value);
+            }
+        } else if (!strcmp(key, "max_len")) {
+            char *err;
+
+            err = str_to_u32(value, &output_trunc->max_len);
+            if (err) {
+                return err;
+            }
+
+            if (output_trunc->max_len < ETH_HEADER_LEN) {
+                return xasprintf("max_len %"PRIu32" is less than the minimum "
+                                 "value %d",
+                                 output_trunc->max_len, ETH_HEADER_LEN);
+            }
+        } else {
+            return xasprintf("invalid key '%s' in output_trunc argument",
+                                key);
+        }
+    }
+    return NULL;
+}
+
+static char * OVS_WARN_UNUSED_RESULT
+parse_OUTPUT(const char *arg, const struct ofpact_parse_params *pp)
+{
+    if (strstr(arg, "port") && strstr(arg, "max_len")) {
+        struct ofpact_output_trunc *output_trunc;
+
+        output_trunc = ofpact_put_OUTPUT_TRUNC(pp->ofpacts);
+        return parse_truncate_subfield(arg, pp, output_trunc);
+    }
+
+    ofp_port_t port;
+    if (ofputil_port_from_string(arg, pp->port_map, &port)) {
+        struct ofpact_output *output = ofpact_put_OUTPUT(pp->ofpacts);
+        output->port = port;
+        output->max_len = output->port == OFPP_CONTROLLER ? UINT16_MAX : 0;
+        return NULL;
+    }
+
+    struct mf_subfield src;
+    char *error = mf_parse_subfield(&src, arg);
+    if (!error) {
+        struct ofpact_output_reg *output_reg;
+
+        output_reg = ofpact_put_OUTPUT_REG(pp->ofpacts);
+        output_reg->max_len = UINT16_MAX;
+        output_reg->src = src;
+        return NULL;
+    }
+    free(error);
+
+    return xasprintf("%s: output to unknown port", arg);
+}
+
+static char *
+mf_from_integer_string_mof(int n_bytes, const char *s,
+                       uint8_t *valuep, uint8_t *maskp)
+{
+    char *tail;
+    const char *err_str = "";
+    int err;
+
+    if (n_bytes == 4) {
+        char *error;
+        ovs_be32 value32, mask32;
+        error = ip_parse_masked(s, &value32, &mask32);
+        if (!error) {
+            memcpy(valuep, &value32, n_bytes);
+            if (maskp) {
+                memcpy(maskp, &mask32, n_bytes);
+            }
+            return NULL;
+        }
+    }
+
+    err = parse_int_string(s, valuep, n_bytes, &tail);
+    
+    if (err || (*tail != '\0' && *tail != '/')) {
+        err_str = "value";
+        goto syntax_error;
+    }
+
+    if (maskp) {
+        if (*tail == '/') {
+            err = parse_int_string(tail + 1, maskp, n_bytes, &tail);
+            if (err || *tail != '\0') {
+                err_str = "mask";
+                goto syntax_error;
+            }
+            int mask_len = *(maskp+n_bytes-1) & UINT8_MAX;
+            int count = 0;
+            memset(maskp, 0, n_bytes);
+            for (; mask_len >= 0; mask_len -= 8) {
+                if (mask_len >= 8) {
+                    count++;
+                    continue;
+                }
+                memset(maskp, 0xff, count);
+                if (mask_len > 0) {
+                    memset(maskp+count, UINT8_MAX << (8-mask_len), 1);
+                }
+            }
+        } else {
+            memset(maskp, 0xff, n_bytes);
+        }
+    }
+
+    return NULL;
+
+syntax_error:
+    if (err == 34) {
+        return xasprintf("%s: %s too large for %u-byte field %s",
+                         s, err_str, n_bytes, s);
+    } else {
+        return xasprintf("%s: bad syntax for %s %s", s, s, err_str);
+    }
+}
+
+
+void
+get_index(enum pmap protocol, int *index)
+{
+    int id = -1;
+
+    for (;protocol > 0;) {
+        id++;
+        protocol >>= 1;
+    }
+    *index = id;
+}
+

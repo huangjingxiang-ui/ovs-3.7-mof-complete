@@ -1,0 +1,10 @@
+sr_mpls_5 :
+  lse_5 : 
+    size : 24
+  ttl_5 : 
+    size : 8
+    
+  Type : 
+
+  Hash :
+    - lse_5

@@ -1,0 +1,703 @@
+static uint16_t crc16_table[256] = {
+    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
+    0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
+    0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
+    0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
+    0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
+    0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
+    0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
+    0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
+    0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
+    0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
+    0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
+    0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
+    0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
+    0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
+    0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
+    0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
+    0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
+    0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
+    0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
+    0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
+    0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
+    0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
+    0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
+    0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
+    0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
+    0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
+    0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
+    0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
+    0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
+    0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
+    0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
+    0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
+};
+
+struct in6_addr
+flow_tnl_dst(const struct flow_tnl *tnl)
+{
+    return tnl->ip_dst ? in6_addr_mapped_ipv4(tnl->ip_dst) : tnl->ipv6_dst;
+}
+
+struct in6_addr
+flow_tnl_src(const struct flow_tnl *tnl)
+{
+    return tnl->ip_src ? in6_addr_mapped_ipv4(tnl->ip_src) : tnl->ipv6_src;
+}
+
+/* Returns true if 's' consists entirely of hex digits, false otherwise. */
+static bool
+is_all_hex(const char *s)
+{
+    return s[strspn(s, "0123456789abcdefABCDEF")] == '\0';
+}
+
+/* Parses 's' as a 16-digit hexadecimal number representing a datapath ID.  On
+ * success stores the dpid into '*dpidp' and returns true, on failure stores 0
+ * into '*dpidp' and returns false.
+ *
+ * Rejects an all-zeros dpid as invalid. */
+bool
+dpid_from_string(const char *s, uint64_t *dpidp)
+{
+    size_t len = strlen(s);
+    *dpidp = ((len == 16 && is_all_hex(s))
+              || (len <= 18 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')
+                  && is_all_hex(s + 2))
+              ? strtoull(s, NULL, 16)
+              : 0);
+    return *dpidp != 0;
+}
+
+uint64_t
+eth_addr_to_uint64(const struct eth_addr ea)
+{
+    return (((uint64_t) ntohs(ea.be16[0]) << 32)
+            | ((uint64_t) ntohs(ea.be16[1]) << 16)
+            | ntohs(ea.be16[2]));
+}
+
+void
+eth_addr_from_uint64(uint64_t x, struct eth_addr *ea)
+{
+    ea->be16[0] = htons(x >> 32);
+    ea->be16[1] = htons((x & 0xFFFF0000) >> 16);
+    ea->be16[2] = htons(x & 0xFFFF);
+}
+
+void
+eth_addr_mark_random(struct eth_addr *ea)
+{
+    ea->ea[0] &= ~1;                /* Unicast. */
+    ea->ea[0] |= 2;                 /* Private. */
+}
+
+/* Returns true if 'ea' is a reserved address, that a bridge must never
+ * forward, false otherwise.
+ *
+ * If you change this function's behavior, please update corresponding
+ * documentation in vswitch.xml at the same time. */
+bool
+eth_addr_is_reserved(const struct eth_addr ea)
+{
+    struct eth_addr_node {
+        struct hmap_node hmap_node;
+        const uint64_t ea64;
+    };
+
+    static struct eth_addr_node nodes[] = {
+        /* STP, IEEE pause frames, and other reserved protocols. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000000ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000001ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000002ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000003ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000004ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000005ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000006ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000007ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000008ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c2000009ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000aULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000bULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000cULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000dULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000eULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x0180c200000fULL },
+
+        /* Extreme protocols. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x00e02b000000ULL }, /* EDP. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x00e02b000004ULL }, /* EAPS. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x00e02b000006ULL }, /* EAPS. */
+
+        /* Cisco protocols. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000c000000ULL }, /* ISL. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccccULL }, /* PAgP, UDLD, CDP,
+                                                            * DTP, VTP. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000ccccccdULL }, /* PVST+. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000ccdcdcdULL }, /* STP Uplink Fast,
+                                                            * FlexLink. */
+
+        /* Cisco CFM. */
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc0ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc1ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc2ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc3ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc4ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc5ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc6ULL },
+        { HMAP_NODE_NULL_INITIALIZER, 0x01000cccccc7ULL },
+    };
+
+    static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
+    struct eth_addr_node *node;
+    static struct hmap addrs;
+    uint64_t ea64;
+
+    if (ovsthread_once_start(&once)) {
+        hmap_init(&addrs);
+        for (node = nodes; node < &nodes[ARRAY_SIZE(nodes)]; node++) {
+            hmap_insert(&addrs, &node->hmap_node, hash_uint64(node->ea64));
+        }
+        ovsthread_once_done(&once);
+    }
+
+    ea64 = eth_addr_to_uint64(ea);
+    HMAP_FOR_EACH_IN_BUCKET (node, hmap_node, hash_uint64(ea64), &addrs) {
+        if (node->ea64 == ea64) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Attempts to parse 's' as an Ethernet address.  If successful, stores the
+ * address in 'ea' and returns true, otherwise zeros 'ea' and returns
+ * false.  This function checks trailing characters. */
+bool
+eth_addr_from_string(const char *s, struct eth_addr *ea)
+{
+    int n = 0;
+    if (ovs_scan(s, ETH_ADDR_SCAN_FMT"%n", ETH_ADDR_SCAN_ARGS(*ea), &n)
+        && !s[n]) {
+        return true;
+    } else {
+        *ea = eth_addr_zero;
+        return false;
+    }
+}
+
+/* Fills 'b' with a Reverse ARP packet with Ethernet source address 'eth_src'.
+ * This function is used by Open vSwitch to compose packets in cases where
+ * context is important but content doesn't (or shouldn't) matter.
+ *
+ * The returned packet has enough headroom to insert an 802.1Q VLAN header if
+ * desired. */
+void
+compose_rarp(struct dp_packet *b, const struct eth_addr eth_src)
+{
+    struct eth_header *eth;
+    struct arp_eth_header *arp;
+
+    dp_packet_clear(b);
+    dp_packet_prealloc_tailroom(b, 2 + ETH_HEADER_LEN + VLAN_HEADER_LEN
+                             + ARP_ETH_HEADER_LEN);
+    dp_packet_reserve(b, 2 + VLAN_HEADER_LEN);
+    eth = dp_packet_put_uninit(b, sizeof *eth);
+    eth->eth_dst = eth_addr_broadcast;
+    eth->eth_src = eth_src;
+    eth->eth_type = htons(ETH_TYPE_RARP);
+
+    arp = dp_packet_put_uninit(b, sizeof *arp);
+    arp->ar_hrd = htons(ARP_HRD_ETHERNET);
+    arp->ar_pro = htons(ARP_PRO_IP);
+    arp->ar_hln = sizeof arp->ar_sha;
+    arp->ar_pln = sizeof arp->ar_spa;
+    arp->ar_op = htons(ARP_OP_RARP);
+    arp->ar_sha = eth_src;
+    put_16aligned_be32(&arp->ar_spa, htonl(0));
+    arp->ar_tha = eth_src;
+    put_16aligned_be32(&arp->ar_tpa, htonl(0));
+
+    dp_packet_reset_offsets(b);
+    dp_packet_set_l3(b, arp);
+    b->packet_type = htonl(PT_ETH);
+}
+
+/* Insert VLAN header according to given TCI. Packet passed must be Ethernet
+ * packet.  Ignores the CFI bit of 'tci' using 0 instead.
+ *
+ * Also adjusts the layer offsets accordingly. */
+void
+eth_push_vlan(struct dp_packet *packet, ovs_be16 tpid, ovs_be16 tci)
+{
+    struct vlan_eth_header *veh;
+
+    /* Insert new 802.1Q header. */
+    veh = dp_packet_resize_l2(packet, VLAN_HEADER_LEN);
+    memmove(veh, (char *)veh + VLAN_HEADER_LEN, 2 * ETH_ADDR_LEN);
+    veh->veth_type = tpid;
+    veh->veth_tci = tci & htons(~VLAN_CFI);
+}
+
+/* Removes outermost VLAN header (if any is present) from 'packet'.
+ *
+ * 'packet->l2_5' should initially point to 'packet''s outer-most VLAN header
+ * or may be NULL if there are no VLAN headers. */
+void
+eth_pop_vlan(struct dp_packet *packet)
+{
+    struct vlan_eth_header *veh = dp_packet_eth(packet);
+
+    if (veh && dp_packet_size(packet) >= sizeof *veh
+        && eth_type_vlan(veh->veth_type)) {
+
+        memmove((char *)veh + VLAN_HEADER_LEN, veh, 2 * ETH_ADDR_LEN);
+        dp_packet_resize_l2(packet, -VLAN_HEADER_LEN);
+    }
+}
+
+/* Push Ethernet header onto 'packet' assuming it is layer 3 */
+void
+push_eth(struct dp_packet *packet, const struct eth_addr *dst,
+         const struct eth_addr *src)
+{
+    struct eth_header *eh;
+
+    ovs_assert(!dp_packet_is_eth(packet));
+    eh = dp_packet_resize_l2(packet, ETH_HEADER_LEN);
+    eh->eth_dst = *dst;
+    eh->eth_src = *src;
+    eh->eth_type = pt_ns_type_be(packet->packet_type);
+    packet->packet_type = htonl(PT_ETH);
+}
+
+/* Removes Ethernet header, including VLAN header, from 'packet'.
+ *
+ * Previous to calling this function, 'ofpbuf_l3(packet)' must not be NULL */
+void
+pop_eth(struct dp_packet *packet)
+{
+    char *l2_5 = dp_packet_l2_5(packet);
+    char *l3 = dp_packet_l3(packet);
+    ovs_be16 ethertype;
+    int increment;
+
+    ovs_assert(dp_packet_is_eth(packet));
+    ovs_assert(l3 != NULL);
+
+    if (l2_5) {
+        increment = packet->l2_5_ofs;
+        ethertype = *(ALIGNED_CAST(ovs_be16 *, (l2_5 - 2)));
+    } else {
+        increment = packet->l3_ofs;
+        ethertype = *(ALIGNED_CAST(ovs_be16 *, (l3 - 2)));
+    }
+
+    dp_packet_resize_l2(packet, -increment);
+    packet->packet_type = PACKET_TYPE_BE(OFPHTN_ETHERTYPE, ntohs(ethertype));
+}
+
+/* Set ethertype of the packet. */
+static void
+set_ethertype(struct dp_packet *packet, ovs_be16 eth_type)
+{
+    struct eth_header *eh = dp_packet_eth(packet);
+
+    if (!eh) {
+        return;
+    }
+
+    if (eth_type_vlan(eh->eth_type)) {
+        ovs_be16 *p;
+        char *l2_5 = dp_packet_l2_5(packet);
+
+        p = ALIGNED_CAST(ovs_be16 *,
+                         (l2_5 ? l2_5 : (char *)dp_packet_l3(packet)) - 2);
+        *p = eth_type;
+    } else {
+        eh->eth_type = eth_type;
+    }
+}
+
+static bool is_mpls(struct dp_packet *packet)
+{
+    return packet->l2_5_ofs != UINT16_MAX;
+}
+
+/* Set time to live (TTL) of an MPLS label stack entry (LSE). */
+void
+set_mpls_lse_ttl(ovs_be32 *lse, uint8_t ttl)
+{
+    *lse &= ~htonl(MPLS_TTL_MASK);
+    *lse |= htonl((ttl << MPLS_TTL_SHIFT) & MPLS_TTL_MASK);
+}
+
+/* Set traffic class (TC) of an MPLS label stack entry (LSE). */
+void
+set_mpls_lse_tc(ovs_be32 *lse, uint8_t tc)
+{
+    *lse &= ~htonl(MPLS_TC_MASK);
+    *lse |= htonl((tc << MPLS_TC_SHIFT) & MPLS_TC_MASK);
+}
+
+/* Set label of an MPLS label stack entry (LSE). */
+void
+set_mpls_lse_label(ovs_be32 *lse, ovs_be32 label)
+{
+    *lse &= ~htonl(MPLS_LABEL_MASK);
+    *lse |= htonl((ntohl(label) << MPLS_LABEL_SHIFT) & MPLS_LABEL_MASK);
+}
+
+/* Set bottom of stack (BoS) bit of an MPLS label stack entry (LSE). */
+void
+set_mpls_lse_bos(ovs_be32 *lse, uint8_t bos)
+{
+    *lse &= ~htonl(MPLS_BOS_MASK);
+    *lse |= htonl((bos << MPLS_BOS_SHIFT) & MPLS_BOS_MASK);
+}
+
+/* Compose an MPLS label stack entry (LSE) from its components:
+ * label, traffic class (TC), time to live (TTL) and
+ * bottom of stack (BoS) bit. */
+ovs_be32
+set_mpls_lse_values(uint8_t ttl, uint8_t tc, uint8_t bos, ovs_be32 label)
+{
+    ovs_be32 lse = htonl(0);
+    set_mpls_lse_ttl(&lse, ttl);
+    set_mpls_lse_tc(&lse, tc);
+    set_mpls_lse_bos(&lse, bos);
+    set_mpls_lse_label(&lse, label);
+    return lse;
+}
+
+/* Set MPLS label stack entry to outermost MPLS header.*/
+void
+set_mpls_lse(struct dp_packet *packet, ovs_be32 mpls_lse)
+{
+    /* Packet type should be MPLS to set label stack entry. */
+    if (is_mpls(packet)) {
+        struct mpls_hdr *mh = dp_packet_l2_5(packet);
+
+        /* Update mpls label stack entry. */
+        put_16aligned_be32(&mh->mpls_lse, mpls_lse);
+    }
+}
+
+/* Push MPLS label stack entry 'lse' onto 'packet' as the outermost MPLS
+ * header.  If 'packet' does not already have any MPLS labels, then its
+ * Ethertype is changed to 'ethtype' (which must be an MPLS Ethertype). */
+void
+push_mpls(struct dp_packet *packet, ovs_be16 ethtype, ovs_be32 lse)
+{
+    char * header;
+    size_t len;
+
+    if (!eth_type_mpls(ethtype)) {
+        return;
+    }
+
+    if (!is_mpls(packet)) {
+        /* Set MPLS label stack offset. */
+        packet->l2_5_ofs = packet->l3_ofs;
+    }
+
+    set_ethertype(packet, ethtype);
+
+    /* Push new MPLS shim header onto packet. */
+    len = packet->l2_5_ofs;
+    header = dp_packet_resize_l2_5(packet, MPLS_HLEN);
+    memmove(header, header + MPLS_HLEN, len);
+    memcpy(header + len, &lse, sizeof lse);
+
+    pkt_metadata_init_conn(&packet->md);
+}
+
+void
+get_offset_index(struct dp_packet *packet, enum pmap flag, size_t *offset, int *index)
+{
+    size_t ofs = 0;
+    int id = 0;
+
+    for (uint64_t i = 1; i < flag; i <<= 1, id++) {
+        if (packet->flag & i) {
+            ofs += phlens[id];
+        }
+    }
+    if (offset) {
+        *offset = ofs;
+    }
+    if (index) {
+        *index = id;
+    }
+}
+
+void
+push_protocol(struct dp_packet *packet, void *data, size_t ofs, size_t len)
+{
+    char * header;
+    header = dp_packet_push_uninit(packet, len);
+    memmove(header, header + len, ofs);
+    memcpy(header + ofs, data, len);
+}
+
+void
+add_protocol(struct dp_packet *packet, enum pmap flag, union protocols protocol)
+{
+    
+    size_t offset;
+    int index;
+
+    VLOG_INFO("add_protocol: packet->flag: %d", packet->flag);
+    VLOG_INFO("add_protocol: flag: %d", flag);
+    if (flag & packet->flag) {
+        return;
+    }
+    
+    get_offset_index(packet, flag, &offset, &index);
+
+    VLOG_INFO("add_protocol: offset: %d, index: %d", offset, index);
+    push_protocol(packet, &protocol, offset, phlens[index]);
+
+    packet->flag += flag;
+}
+
+void
+pop_protocol(struct dp_packet *packet, size_t ofs, size_t len)
+{
+    memmove((char*)dp_packet_data(packet) + len, dp_packet_data(packet), ofs);
+    dp_packet_pull(packet, len);
+
+    // dp_packet_reset_offload(packet);
+}
+
+void 
+del_protocol(struct dp_packet *packet, enum pmap flag)
+{
+    size_t offset;
+    int index;
+
+    if (!(packet->flag & flag)) {
+        return;
+    }
+
+    get_offset_index(packet, flag, &offset, &index);
+    pop_protocol(packet, offset, phlens[index]);
+
+    packet->flag -= flag;
+}
+
+void 
+mod_fields__(struct dp_packet *packet, uint8_t *data, uint8_t *mask,
+             size_t offset, size_t len)
+{
+    uint8_t *header;
+    size_t i;
+
+    header = dp_packet_data(packet) + offset;
+    for (i = 0; i < len; i++) {
+        if (*(mask+i)) {
+            *(header+i) = ((*header+i) & ~(*(mask+i))) | (*(data+i) & *(mask+i));
+        }
+    }
+}
+
+void 
+mod_fields(struct dp_packet *packet, enum pmap flag, 
+            union protocols protocol, union protocols mask)
+{
+    size_t offset;
+    int index;
+
+    if (!(packet->flag & flag)) {
+        return;
+    }
+
+    get_offset_index(packet, flag, &offset, &index);
+    mod_fields__(packet, &protocol, &mask, offset, phlens[index]);
+}
+
+void
+crc8(uint8_t *data, uint8_t *crc)
+{
+    uint8_t i = 0x80;
+
+    for (; i != 0; i /= 2) {
+        if ((*crc & 0x80) != 0) {
+            *crc *= 2;
+            *crc ^= 0x07;
+        } else {
+            *crc *= 2;
+        }
+        if ((*data & i) != 0) {
+            *crc ^= 0x07;
+        }
+    }
+}
+
+void 
+crc16(uint8_t *data, uint16_t *crc) 
+{
+    *crc = crc16_table[((*crc >> 8) ^ (*data)) & 0xff] ^ (*crc << 8);
+}   
+
+bool
+check_crc__(struct dp_packet *packet, enum pmap flag,
+            uint8_t *mask, size_t offset, size_t index)
+{
+    uint8_t crc_8 = 0;
+    uint16_t crc_16 = 0;
+    uint32_t crc_32 = 0;
+    size_t i;
+    bool same;
+    char *header;
+
+    header = dp_packet_data(packet) + offset;
+    switch (crc_len[index]) {
+        case 1 : {
+            for (i = 0; i < crc_ofs[index]; i++) {
+                if (*(mask+i)) {
+                    crc8((header+i), &crc_8);
+                }
+            }
+            same = *(header+crc_ofs[index]) == crc_8;
+            *(header+crc_ofs[index]) = crc_8;
+            break;
+        }
+        case 2 : {
+            for (i = 0; i < crc_ofs[index]; i++) {
+                if (*(mask+i)) {
+                    crc16((header+i), &crc_16);
+                }
+            }
+            same = *(uint16_t*)(header+crc_ofs[index]) == htons(crc_16);
+            *(uint16_t*)(header+crc_ofs[index]) = htons(crc_16);
+            break;
+        }
+        default: 
+            same = false;
+    }
+    return same;
+}
+
+bool 
+check_crc(struct dp_packet *packet, enum pmap flag,
+          union protocols mask)
+{
+    size_t offset;
+    int index;
+    // bool same;
+
+    if (!(packet->flag & flag)) {
+        return true;
+    }
+
+    get_offset_index(packet, flag, &offset, &index);
+    return check_crc__(packet, flag, &mask, offset, index);
+
+}
+
+// void
+// calc_crc__(struct dp_packet *packet, enum pmap flag,
+//             uint8_t *mask, size_t offset, size_t index)
+// {
+//     uint8_t crc_8 = 0;
+//     uint16_t crc_16 = 0;
+//     uint32_t crc_32 = 0;
+//     size_t i;
+//     char *header;
+
+//     header = dp_packet_data(packet) + offset;
+//     switch (crc_len[index]) {
+//         case 1 : {
+//             for (i = 0; i < crc_ofs[index]; i++) {
+//                 if (*(mask+i)) {
+//                     crc8((header+i), &crc_8);
+//                 }
+//             }
+//             *(header+crc_ofs[index]) = crc_8;
+//             return;
+//         }
+//         case 2 : {
+//             for (i = 0; i < crc_ofs[index]; i++) {
+//                 if (*(mask+i)) {
+//                     crc16((header+i), &crc_16);
+//                 }
+//             }
+//             *(uint16_t*)(header+crc_ofs[index]) = htons(crc_16);
+//             return;
+//         }
+//         default: 
+//             return;
+//     }
+// }
+
+// void
+// calc_crc(struct dp_packet *packet, enum pmap flag,
+//          union protocols mask)
+// {
+//     size_t offset;
+//     int index;
+    
+//     if (!(packet->flag & flag)) {
+//         return;
+//     }
+
+//     get_offset_index(packet, flag, &offset, &index);
+//     check_crc__(packet, flag, &mask, offset, index);
+// }
+
+size_t 
+get_headers_len(struct dp_packet *packet)
+{
+    size_t hl = 0;
+    uint64_t i = 1;
+    int id = 0;
+
+    for ( ; i <= packet->flag; i <<= 1, id++) {
+        if (packet->flag & i) {
+            hl += phlens[id];
+        }
+    }
+    return hl;
+}
+
+void 
+payload_crc__(struct dp_packet *packet, size_t offset, size_t crc_len)
+{
+    uint8_t crc_8 = 0;
+    uint16_t crc_16 = 0;
+    uint32_t crc_32 = 0;
+    size_t i;
+    char *payload;
+
+    payload = dp_packet_data(packet) + offset;
+    switch (crc_len) {
+        case 1 : {
+            for (i = 0; i < dp_packet_size(packet)-offset; i++) {
+                crc8((payload+i), &crc_8);
+            }
+            uint8_t *header = dp_packet_add_uninit(packet, 1);
+            *header = crc_8;
+            break;
+        }
+        case 2 : {
+            for (i = 0; i < dp_packet_size(packet)-offset; i++) {
+                crc16((payload+i), &crc_16);
+            }
+            uint16_t *header = dp_packet_add_uninit(packet, 2);
+            *header = htons(crc_16);
+            break;
+        }
+        case 4 : {
+            VLOG_INFO("unrealized");
+            break;
+        }
+    }
+}
+
+void
+payload_crc(struct dp_packet *packet, size_t len)
+{
+    size_t headers_len = get_headers_len(packet);
+    payload_crc__(packet, headers_len, len);
+}

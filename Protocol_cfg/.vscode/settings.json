@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "ofp-actions_c_save1": "c",
+        "packets_c_save3": "c",
+        "string_view": "c"
+    }
+}

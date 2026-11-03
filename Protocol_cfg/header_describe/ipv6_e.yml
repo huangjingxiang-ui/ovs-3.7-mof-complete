@@ -1,0 +1,21 @@
+ipv6_e :
+  ipv6_ver_tp_flb_e : 
+    size : 32
+  ipv6_plen_e : 
+    size : 16
+  ipv6_e_type : 
+    size : 8
+  ipv6_hlmt_e : 
+    size : 8 
+  ipv6_src_e : 
+    size : 128
+  ipv6_dst_e : 
+    size : 128
+    
+  Type : 
+    ipv6_e_TYPE_tcp : '0x06'
+    ipv6_e_TYPE_udp : '0x11'
+    ipv6_e_TYPE_icmpv6 : '0x3A'
+    ipv6_e_TYPE_srv6 : '0x12'
+  
+  #为何这里没有hash选择？

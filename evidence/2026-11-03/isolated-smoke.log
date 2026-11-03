@@ -1,0 +1,155 @@
+[sudo] ovs 的密码： Evidence directory: /tmp/mof-smoke-o3duyrse
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+output  cookie=0x0, duration=0.124s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-o3duyrse/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:11Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-o3duyrse/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-o3duyrse/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-ldxs3y74
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+mod_fields  cookie=0x0, duration=0.110s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-ldxs3y74/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:13Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-ldxs3y74/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-ldxs3y74/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-7ckh4znw
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+add_protocol  cookie=0x0, duration=0.096s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-7ckh4znw/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:15Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-7ckh4znw/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-7ckh4znw/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-pzml2ker
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+del_protocol  cookie=0x0, duration=0.131s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,goto_table:1
+ cookie=0x0, duration=0.103s, table=1, n_packets=1, n_bytes=69, priority=200,in_port=1 actions=del_protocol:vlan1 ,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-pzml2ker/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:16Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-pzml2ker/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-pzml2ker/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-3r3_wmy7
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+move_protocol  cookie=0x0, duration=0.120s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,move_protocol: src=0x2, dst=0x4,goto_table:1
+ cookie=0x0, duration=0.094s, table=1, n_packets=2, n_bytes=138, priority=200,vlan2_qid=0x64 actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-3r3_wmy7/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:18Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-3r3_wmy7/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-3r3_wmy7/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-92u1kqd4
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+goto_table  cookie=0x0, duration=0.126s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=mod_fields(mac, mac_dst=0x200000000cc,) ,goto_table:1
+ cookie=0x0, duration=0.108s, table=1, n_packets=2, n_bytes=138, priority=200,mac_dst=0x200000000cc actions=output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-92u1kqd4/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:20Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-92u1kqd4/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-92u1kqd4/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-_wip5ilv
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+add_bytes  cookie=0x0, duration=0.093s, table=0, n_packets=2, n_bytes=138, priority=200,in_port=1 actions=add_bytes: 0200000000CC0200000000AA0800,output:2
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-_wip5ilv/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:21Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-_wip5ilv/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-_wip5ilv/vswitchd.ctl: transaction error (End of file)
+
+Evidence directory: /tmp/mof-smoke-i3jsmehx
+ovs-vswitchd (Open vSwitch) 3.7.0
+DPDK 23.11.0
+
+dpdk_initialized: true
+
+drop  cookie=0x0, duration=0.111s, table=0, n_packets=1, n_bytes=69, priority=200,in_port=1 actions=drop
+ {ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}
+
+Traceback (most recent call last):
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 55, in <module>
+    app('exit')
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 18, in app
+    def app(*args): return run(SRC/'utilities/ovs-appctl','-t',OUT/'vswitchd.ctl',*args)
+  File "/home/ovs/ovs-3.7-mof-complete/scripts/functional_smoke.py", line 14, in run
+    if check and p.returncode: raise RuntimeError(f'{args}: {p.stdout}')
+RuntimeError: (PosixPath('/home/ovs/ovs-3.7-mof-complete/openvswitch-3.7.0-mof/utilities/ovs-appctl'), '-t', PosixPath('/tmp/mof-smoke-i3jsmehx/vswitchd.ctl'), 'exit'): 2026-11-03T10:31:23Z|00001|unixctl|WARN|error communicating with unix:/tmp/mof-smoke-i3jsmehx/vswitchd.ctl: End of file
+ovs-appctl: /tmp/mof-smoke-i3jsmehx/vswitchd.ctl: transaction error (End of file)
+

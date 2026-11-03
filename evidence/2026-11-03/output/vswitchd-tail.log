@@ -1,0 +1,100 @@
+2026-11-03T10:39:24.798Z|12581|flow(pmd-c01/id:7)|INFO|package data[3] (8Bytes):8e 7f c0 0 2 1 c6 33
+2026-11-03T10:39:24.798Z|12582|flow(pmd-c01/id:7)|INFO|package data[4] (8Bytes):64 1 30 39 5b a0 0 23
+2026-11-03T10:39:24.798Z|12583|flow(pmd-c01/id:7)|INFO|package data[5] (8Bytes):15 ba 4d 4f 46 2d 66 75
+2026-11-03T10:39:24.798Z|12584|flow(pmd-c01/id:7)|INFO|package data[6] (8Bytes):6e 63 74 69 6f 6e 61 6c
+2026-11-03T10:39:24.798Z|12585|flow(pmd-c01/id:7)|INFO|package data[7] (8Bytes):2d 74 65 73 74 2d 70 61
+2026-11-03T10:39:24.798Z|12586|flow(pmd-c01/id:7)|INFO|package data[8] (8Bytes):79 6c 6f 61 64 0 0 0
+2026-11-03T10:39:24.798Z|12587|flow(pmd-c01/id:7)|INFO|package data[9] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12588|flow(pmd-c01/id:7)|INFO|package data[10] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12589|flow(pmd-c01/id:7)|INFO|package data[11] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12590|flow(pmd-c01/id:7)|INFO|package data[12] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12591|flow(pmd-c01/id:7)|INFO|package data[13] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12592|flow(pmd-c01/id:7)|INFO|package data[14] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12593|flow(pmd-c01/id:7)|INFO|package data[15] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12594|flow(pmd-c01/id:7)|INFO|package data[16] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12595|flow(pmd-c01/id:7)|INFO|package data[17] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12596|flow(pmd-c01/id:7)|INFO|package data[18] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12597|flow(pmd-c01/id:7)|INFO|package data[19] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12598|flow(pmd-c01/id:7)|INFO|package data[20] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12599|flow(pmd-c01/id:7)|INFO|package data[21] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12600|flow(pmd-c01/id:7)|INFO|package data[22] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12601|flow(pmd-c01/id:7)|INFO|package data[23] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12602|flow(pmd-c01/id:7)|INFO|package data[24] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12603|flow(pmd-c01/id:7)|INFO|enter dl parser
+2026-11-03T10:39:24.798Z|12604|flow(pmd-c01/id:7)|INFO|mac_type:8
+2026-11-03T10:39:24.798Z|12605|flow(pmd-c01/id:7)|INFO|vlan label count:0
+2026-11-03T10:39:24.798Z|12606|flow(pmd-c01/id:7)|INFO|enter ipv4_e parser
+2026-11-03T10:39:24.798Z|12607|flow(pmd-c01/id:7)|INFO|enter udp parser
+2026-11-03T10:39:24.798Z|12608|flow(pmd-c01/id:7)|INFO|size of flow is 824
+2026-11-03T10:39:24.798Z|12609|flow(pmd-c01/id:7)|INFO|size of flow_mof is 824
+2026-11-03T10:39:24.798Z|12610|flow(pmd-c01/id:7)|INFO|****************Before MODIFY********************
+2026-11-03T10:39:24.798Z|12611|flow(pmd-c01/id:7)|INFO|package data[0] (8Bytes):0 11 22 33 44 55 2 0
+2026-11-03T10:39:24.798Z|12612|flow(pmd-c01/id:7)|INFO|package data[1] (8Bytes):0 0 0 a 8 0 45 0
+2026-11-03T10:39:24.798Z|12613|flow(pmd-c01/id:7)|INFO|package data[2] (8Bytes):0 37 0 1 0 0 40 11
+2026-11-03T10:39:24.798Z|12614|flow(pmd-c01/id:7)|INFO|package data[3] (8Bytes):8e 7f c0 0 2 1 c6 33
+2026-11-03T10:39:24.798Z|12615|flow(pmd-c01/id:7)|INFO|package data[4] (8Bytes):64 1 30 39 5b a0 0 23
+2026-11-03T10:39:24.798Z|12616|flow(pmd-c01/id:7)|INFO|package data[5] (8Bytes):15 ba 4d 4f 46 2d 66 75
+2026-11-03T10:39:24.798Z|12617|flow(pmd-c01/id:7)|INFO|package data[6] (8Bytes):6e 63 74 69 6f 6e 61 6c
+2026-11-03T10:39:24.798Z|12618|flow(pmd-c01/id:7)|INFO|package data[7] (8Bytes):2d 74 65 73 74 2d 70 61
+2026-11-03T10:39:24.798Z|12619|flow(pmd-c01/id:7)|INFO|package data[8] (8Bytes):79 6c 6f 61 64 0 0 0
+2026-11-03T10:39:24.798Z|12620|flow(pmd-c01/id:7)|INFO|package data[9] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12621|flow(pmd-c01/id:7)|INFO|package data[10] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12622|flow(pmd-c01/id:7)|INFO|package data[11] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12623|flow(pmd-c01/id:7)|INFO|package data[12] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12624|flow(pmd-c01/id:7)|INFO|package data[13] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12625|flow(pmd-c01/id:7)|INFO|package data[14] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12626|flow(pmd-c01/id:7)|INFO|package data[15] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12627|flow(pmd-c01/id:7)|INFO|package data[16] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12628|flow(pmd-c01/id:7)|INFO|package data[17] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12629|flow(pmd-c01/id:7)|INFO|package data[18] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12630|flow(pmd-c01/id:7)|INFO|package data[19] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12631|flow(pmd-c01/id:7)|INFO|package data[20] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12632|flow(pmd-c01/id:7)|INFO|package data[21] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12633|flow(pmd-c01/id:7)|INFO|package data[22] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12634|flow(pmd-c01/id:7)|INFO|package data[23] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12635|flow(pmd-c01/id:7)|INFO|package data[24] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12636|flow(pmd-c01/id:7)|INFO|enter dl parser
+2026-11-03T10:39:24.798Z|12637|flow(pmd-c01/id:7)|INFO|mac_type:8
+2026-11-03T10:39:24.798Z|12638|flow(pmd-c01/id:7)|INFO|vlan label count:0
+2026-11-03T10:39:24.798Z|12639|flow(pmd-c01/id:7)|INFO|enter ipv4_e parser
+2026-11-03T10:39:24.798Z|12640|flow(pmd-c01/id:7)|INFO|enter udp parser
+2026-11-03T10:39:24.798Z|12641|flow(pmd-c01/id:7)|INFO|size of flow is 824
+2026-11-03T10:39:24.798Z|12642|flow(pmd-c01/id:7)|INFO|size of flow_mof is 824
+2026-11-03T10:39:24.798Z|12643|flow(pmd-c01/id:7)|INFO|****************Before MODIFY********************
+2026-11-03T10:39:24.798Z|12644|flow(pmd-c01/id:7)|INFO|package data[0] (8Bytes):0 11 22 33 44 55 2 0
+2026-11-03T10:39:24.798Z|12645|flow(pmd-c01/id:7)|INFO|package data[1] (8Bytes):0 0 0 a 8 0 45 0
+2026-11-03T10:39:24.798Z|12646|flow(pmd-c01/id:7)|INFO|package data[2] (8Bytes):0 37 0 1 0 0 40 11
+2026-11-03T10:39:24.798Z|12647|flow(pmd-c01/id:7)|INFO|package data[3] (8Bytes):8e 7f c0 0 2 1 c6 33
+2026-11-03T10:39:24.798Z|12648|flow(pmd-c01/id:7)|INFO|package data[4] (8Bytes):64 1 30 39 5b a0 0 23
+2026-11-03T10:39:24.798Z|12649|flow(pmd-c01/id:7)|INFO|package data[5] (8Bytes):15 ba 4d 4f 46 2d 66 75
+2026-11-03T10:39:24.798Z|12650|flow(pmd-c01/id:7)|INFO|package data[6] (8Bytes):6e 63 74 69 6f 6e 61 6c
+2026-11-03T10:39:24.798Z|12651|flow(pmd-c01/id:7)|INFO|package data[7] (8Bytes):2d 74 65 73 74 2d 70 61
+2026-11-03T10:39:24.798Z|12652|flow(pmd-c01/id:7)|INFO|package data[8] (8Bytes):79 6c 6f 61 64 0 0 0
+2026-11-03T10:39:24.798Z|12653|flow(pmd-c01/id:7)|INFO|package data[9] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12654|flow(pmd-c01/id:7)|INFO|package data[10] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12655|flow(pmd-c01/id:7)|INFO|package data[11] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12656|flow(pmd-c01/id:7)|INFO|package data[12] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12657|flow(pmd-c01/id:7)|INFO|package data[13] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12658|flow(pmd-c01/id:7)|INFO|package data[14] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12659|flow(pmd-c01/id:7)|INFO|package data[15] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12660|flow(pmd-c01/id:7)|INFO|package data[16] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12661|flow(pmd-c01/id:7)|INFO|package data[17] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12662|flow(pmd-c01/id:7)|INFO|package data[18] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12663|flow(pmd-c01/id:7)|INFO|package data[19] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12664|flow(pmd-c01/id:7)|INFO|package data[20] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12665|flow(pmd-c01/id:7)|INFO|package data[21] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12666|flow(pmd-c01/id:7)|INFO|package data[22] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12667|flow(pmd-c01/id:7)|INFO|package data[23] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12668|flow(pmd-c01/id:7)|INFO|package data[24] (8Bytes):0 0 0 0 0 0 0 0
+2026-11-03T10:39:24.798Z|12669|flow(pmd-c01/id:7)|INFO|enter dl parser
+2026-11-03T10:39:24.798Z|12670|flow(pmd-c01/id:7)|INFO|mac_type:8
+2026-11-03T10:39:24.798Z|12671|flow(pmd-c01/id:7)|INFO|vlan label count:0
+2026-11-03T10:39:24.798Z|12672|flow(pmd-c01/id:7)|INFO|enter ipv4_e parser
+2026-11-03T10:39:24.798Z|12673|flow(pmd-c01/id:7)|INFO|enter udp parser
+2026-11-03T10:39:24.799Z|00159|dpif_netdev|INFO|Performing pmd to rx queue assignment using cycles algorithm.
+2026-11-03T10:39:24.799Z|00160|dpif_netdev|INFO|Core  1 on numa node 0 assigned port 'pcap-out' rx queue 0 (measured processing cycles 0).
+2026-11-03T10:39:24.799Z|00001|netdev_dpdk(urcu3)|INFO|Device 'net_pcap1,rx_pcap=/tmp/mof-smoke-0yzpesxu/input.pcap,infinite_rx=1' has been removed and detached
+2026-11-03T10:39:24.800Z|00161|dpif_netdev|INFO|PMD thread on numa_id: 0, core id:  1 destroyed.
+2026-11-03T10:39:24.801Z|12674|dpdk(pmd-c01/id:7)|INFO|PMD thread released DPDK lcore 1.
+2026-11-03T10:39:24.801Z|00162|ofproto_dpif_upcall|WARN|xlate_key failed (No such device)!
+2026-11-03T10:39:24.803Z|00002|netdev_dpdk(urcu3)|INFO|Device 'net_pcap0,tx_pcap=/tmp/mof-smoke-0yzpesxu/output.pcap' has been removed and detached

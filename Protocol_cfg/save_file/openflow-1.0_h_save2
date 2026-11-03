@@ -1,0 +1,205 @@
+
+
+enum ofp10_flow_mod_flags {
+    OFPFF10_EMERG       = 1 << 2 /* Part of "emergency flow cache". */
+};
+
+/* Flow setup and teardown (controller -> datapath). */
+struct ofp10_flow_mod {
+    struct ofp10_match match;    /* Fields to match */
+    ovs_be64 cookie;             /* Opaque controller-issued identifier. */
+
+    /* Flow actions. */
+    ovs_be16 command;             /* One of OFPFC_*. */
+    ovs_be16 idle_timeout;        /* Idle time before discarding (seconds). */
+    ovs_be16 hard_timeout;        /* Max time before discarding (seconds). */
+    ovs_be16 priority;            /* Priority level of flow entry. */
+    ovs_be32 buffer_id;           /* Buffered packet to apply to (or -1).
+                                     Not meaningful for OFPFC_DELETE*. */
+    ovs_be16 out_port;            /* For OFPFC_DELETE* commands, require
+                                     matching entries to include this as an
+                                     output port.  A value of OFPP_NONE
+                                     indicates no restriction. */
+    ovs_be16 flags;               /* One of OFPFF_*. */
+
+    /* Followed by OpenFlow actions whose length is inferred from the length
+     * field in the OpenFlow header. */
+};
+OFP_ASSERT(sizeof(struct ofp10_flow_mod) == 64);
+
+struct ofp10_flow_mod_mof {
+    /* ovs_be64 sp_flag; */
+    ovs_be64 cookie;             /* Opaque controller-issued identifier. */
+
+    /* Flow actions. */
+    ovs_be16 command;             /* One of OFPFC_*. */
+    ovs_be16 idle_timeout;        /* Idle time before discarding (seconds). */
+    ovs_be16 hard_timeout;        /* Max time before discarding (seconds). */
+    ovs_be16 priority;            /* Priority level of flow entry. */
+    ovs_be32 buffer_id;           /* Buffered packet to apply to (or -1).
+                                     Not meaningful for OFPFC_DELETE*. */
+    ovs_be16 out_port;            /* For OFPFC_DELETE* commands, require
+                                     matching entries to include this as an
+                                     output port.  A value of OFPP_NONE
+                                     indicates no restriction. */
+    ovs_be16 flags;               /* One of OFPFF_*. */
+
+    /* Followed by OpenFlow actions whose length is inferred from the length
+     * field in the OpenFlow header. */
+};
+
+/* Flow removed (datapath -> controller). */
+struct ofp10_flow_removed {
+    struct ofp10_match match; /* Description of fields. */
+    ovs_be64 cookie;          /* Opaque controller-issued identifier. */
+
+    ovs_be16 priority;        /* Priority level of flow entry. */
+    uint8_t reason;           /* One of OFPRR_*. */
+    uint8_t pad[1];           /* Align to 32-bits. */
+
+    ovs_be32 duration_sec;    /* Time flow was alive in seconds. */
+    ovs_be32 duration_nsec;   /* Time flow was alive in nanoseconds beyond
+                                 duration_sec. */
+    ovs_be16 idle_timeout;    /* Idle timeout from original flow mod. */
+    uint8_t pad2[2];          /* Align to 64-bits. */
+    ovs_be64 packet_count;
+    ovs_be64 byte_count;
+};
+OFP_ASSERT(sizeof(struct ofp10_flow_removed) == 80);
+
+/* Stats request of type OFPST_AGGREGATE or OFPST_FLOW. */
+struct ofp10_flow_stats_request {
+    struct ofp10_match match; /* Fields to match. */
+    uint8_t table_id;         /* ID of table to read (from ofp_table_stats)
+                                 or 0xff for all tables. */
+    uint8_t pad;              /* Align to 32 bits. */
+    ovs_be16 out_port;        /* Require matching entries to include this
+                                 as an output port.  A value of OFPP_NONE
+                                 indicates no restriction. */
+};
+OFP_ASSERT(sizeof(struct ofp10_flow_stats_request) == 44);
+
+struct ofp10_flow_stats_request_mof {
+    struct ofp10_match_mof masks;        /* Fields to match. */
+    struct ofp10_match_mof match;        /* Fields to mask. */
+    uint8_t table_id;         /* ID of table to read (from ofp_table_stats)
+                                 or 0xff for all tables. */
+    uint8_t pad;              /* Align to 32 bits. */
+    ovs_be16 out_port;        /* Require matching entries to include this
+                                 as an output port.  A value of OFPP_NONE
+                                 indicates no restriction. */
+};
+
+/* Body of reply to OFPST_FLOW request. */
+struct ofp10_flow_stats {
+    ovs_be16 length;          /* Length of this entry. */
+    uint8_t table_id;         /* ID of table flow came from. */
+    uint8_t pad;
+    struct ofp10_match match; /* Description of fields. */
+    ovs_be32 duration_sec;    /* Time flow has been alive in seconds. */
+    ovs_be32 duration_nsec;   /* Time flow has been alive in nanoseconds
+                                 beyond duration_sec. */
+    ovs_be16 priority;        /* Priority of the entry. Only meaningful
+                                 when this is not an exact-match entry. */
+    ovs_be16 idle_timeout;    /* Number of seconds idle before expiration. */
+    ovs_be16 hard_timeout;    /* Number of seconds before expiration. */
+    uint8_t pad2[6];          /* Align to 64 bits. */
+    ovs_32aligned_be64 cookie;       /* Opaque controller-issued identifier. */
+    ovs_32aligned_be64 packet_count; /* Number of packets in flow. */
+    ovs_32aligned_be64 byte_count;   /* Number of bytes in flow. */
+    /* Followed by OpenFlow actions whose length is inferred from 'length'. */
+};
+OFP_ASSERT(sizeof(struct ofp10_flow_stats) == 88);
+
+struct ofp10_flow_stats_mof {
+    struct ofp10_match_mof masks;
+    struct ofp10_match_mof match;
+    ovs_be16 length;          /* Length of this entry. */
+    uint8_t table_id;         /* ID of table flow came from. */
+    uint8_t pad;
+    ovs_be32 duration_sec;    /* Time flow has been alive in seconds. */
+    ovs_be32 duration_nsec;   /* Time flow has been alive in nanoseconds
+                                 beyond duration_sec. */
+    ovs_be16 priority;        /* Priority of the entry. Only meaningful
+                                 when this is not an exact-match entry. */
+    ovs_be16 idle_timeout;    /* Number of seconds idle before expiration. */
+    ovs_be16 hard_timeout;    /* Number of seconds before expiration. */
+    uint8_t pad2[30];          /* Align to 64 bits. */
+    ovs_32aligned_be64 cookie;       /* Opaque controller-issued identifier. */
+    ovs_32aligned_be64 packet_count; /* Number of packets in flow. */
+    ovs_32aligned_be64 byte_count;   /* Number of bytes in flow. */
+    /* Followed by OpenFlow actions whose length is inferred from 'length'. */
+};
+
+/* Body of reply to OFPST_TABLE request. */
+struct ofp10_table_stats {
+    uint8_t table_id;        /* Identifier of table.  Lower numbered tables
+                                are consulted first. */
+    uint8_t pad[3];          /* Align to 32-bits. */
+    char name[OFP_MAX_TABLE_NAME_LEN];
+    ovs_be32 wildcards;      /* Bitmap of OFPFW10_* wildcards that are
+                                supported by the table. */
+    ovs_be32 max_entries;    /* Max number of entries supported. */
+    ovs_be32 active_count;   /* Number of active entries. */
+    ovs_32aligned_be64 lookup_count;  /* # of packets looked up in table. */
+    ovs_32aligned_be64 matched_count; /* Number of packets that hit table. */
+};
+OFP_ASSERT(sizeof(struct ofp10_table_stats) == 64);
+
+/* Stats request of type OFPST_PORT. */
+struct ofp10_port_stats_request {
+    ovs_be16 port_no;        /* OFPST_PORT message may request statistics
+                                for a single port (specified with port_no)
+                                or for all ports (port_no == OFPP_NONE). */
+    uint8_t pad[6];
+};
+OFP_ASSERT(sizeof(struct ofp10_port_stats_request) == 8);
+
+/* Body of reply to OFPST_PORT request. If a counter is unsupported, set
+ * the field to all ones. */
+struct ofp10_port_stats {
+    ovs_be16 port_no;
+    uint8_t pad[6];          /* Align to 64-bits. */
+    ovs_32aligned_be64 rx_packets;     /* Number of received packets. */
+    ovs_32aligned_be64 tx_packets;     /* Number of transmitted packets. */
+    ovs_32aligned_be64 rx_bytes;       /* Number of received bytes. */
+    ovs_32aligned_be64 tx_bytes;       /* Number of transmitted bytes. */
+    ovs_32aligned_be64 rx_dropped;     /* Number of packets dropped by RX. */
+    ovs_32aligned_be64 tx_dropped;     /* Number of packets dropped by TX. */
+    ovs_32aligned_be64 rx_errors; /* Number of receive errors.  This is a
+                                     super-set of receive errors and should be
+                                     great than or equal to the sum of all
+                                     rx_*_err values. */
+    ovs_32aligned_be64 tx_errors; /* Number of transmit errors.  This is a
+                                     super-set of transmit errors. */
+    ovs_32aligned_be64 rx_frame_err; /* Number of frame alignment errors. */
+    ovs_32aligned_be64 rx_over_err;  /* Number of packets with RX overrun. */
+    ovs_32aligned_be64 rx_crc_err;   /* Number of CRC errors. */
+    ovs_32aligned_be64 collisions;   /* Number of collisions. */
+};
+OFP_ASSERT(sizeof(struct ofp10_port_stats) == 104);
+
+/* All ones is used to indicate all queues in a port (for stats retrieval). */
+#define OFPQ_ALL      0xffffffff
+
+/* Body for stats request of type OFPST_QUEUE. */
+struct ofp10_queue_stats_request {
+    ovs_be16 port_no;        /* All ports if OFPP_ALL. */
+    uint8_t pad[2];          /* Align to 32-bits. */
+    ovs_be32 queue_id;       /* All queues if OFPQ_ALL. */
+};
+OFP_ASSERT(sizeof(struct ofp10_queue_stats_request) == 8);
+
+/* Body for stats reply of type OFPST_QUEUE consists of an array of this
+ * structure type. */
+struct ofp10_queue_stats {
+    ovs_be16 port_no;
+    uint8_t pad[2];          /* Align to 32-bits. */
+    ovs_be32 queue_id;       /* Queue id. */
+    ovs_32aligned_be64 tx_bytes;   /* Number of transmitted bytes. */
+    ovs_32aligned_be64 tx_packets; /* Number of transmitted packets. */
+    ovs_32aligned_be64 tx_errors;  /* # of packets dropped due to overrun. */
+};
+OFP_ASSERT(sizeof(struct ofp10_queue_stats) == 32);
+
+#endif /* openflow/openflow-1.0.h */

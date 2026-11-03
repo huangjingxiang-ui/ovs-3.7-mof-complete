@@ -1,0 +1,19 @@
+
+        /**
+         * Uses an extension selector.
+         *
+         * @param extensionSelector extension selector
+         * @param deviceId device ID
+         * @return a selection builder
+         */
+        Builder extension(ExtensionSelector extensionSelector, DeviceId deviceId);
+
+        /**
+         * Builds an immutable traffic selector.
+         *
+         * @return traffic selector
+         */
+        TrafficSelector build();
+    }
+}
+

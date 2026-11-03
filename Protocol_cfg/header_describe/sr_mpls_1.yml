@@ -1,0 +1,10 @@
+sr_mpls_1 :
+  lse_1 : 
+    size : 24
+  ttl_1 : 
+    size : 8
+    
+  Type : 
+
+  Hash :
+    - lse_1

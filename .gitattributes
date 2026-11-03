@@ -1,0 +1,8 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+# The canonical generator fingerprint includes exact YAML bytes.
+*.yml -text
+*.yaml -text

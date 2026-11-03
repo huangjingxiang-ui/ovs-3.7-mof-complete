@@ -1,0 +1,24 @@
+icmpv6 :
+  v6_Type :
+    size : 8
+  v6_code :
+    size : 8
+  v6_checksum :
+    size : 16
+  v6_flags :
+    size : 32
+  nd_target :
+    size : 128
+  icmpv6_type :
+    size : 8
+  icmpv6_length :
+    size : 8
+  nd_dst_mac :
+    size : 48
+
+  Type :
+
+  Hash :
+    - nd_target
+    - nd_dst_mac
+
