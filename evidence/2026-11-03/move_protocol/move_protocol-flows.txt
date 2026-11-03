@@ -1,4 +1,0 @@
- cookie=0x0, duration=0.126s, table=0, n_packets=3, n_bytes=207, priority=200,in_port=1 actions=add_protocol(vlan1, vlan1_tpid=0x8100,vlan1_qid=0x64,) ,move_protocol: src=0x2, dst=0x4,goto_table:1
- cookie=0x0, duration=0.096s, table=1, n_packets=2, n_bytes=138, priority=200,vlan2_qid=0x64 actions=output:2
-
-{ovs_rx_qos_drops=0, ovs_tx_failure_drops=0, ovs_tx_invalid_hwol_drops=0, ovs_tx_mtu_exceeded_drops=0, ovs_tx_qos_drops=0, rx_bytes=2208, rx_dropped=0, rx_errors=0, rx_mbuf_allocation_errors=0, rx_missed_errors=0, rx_packets=32, rx_q0_bytes=2208, rx_q0_errors=0, rx_q0_packets=32, tx_bytes=0, tx_dropped=0, tx_errors=0, tx_packets=0, tx_q0_bytes=0, tx_q0_packets=0}

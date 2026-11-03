@@ -25,8 +25,10 @@ Protocol_cfg/tmp_file_java/
 Protocol_cfg/PyPrj/cfile/
 Protocol_cfg/PyPrj/javafile/*
 !Protocol_cfg/PyPrj/javafile/Instructions_ori
-evidence/**/build.log
-evidence/**/clean-build.log
-evidence/**/fix-build.log
+/evidence/
+/功能复验报告.html
+/迁移验证记录.md
+/scripts/create_validation_report.py
+/scripts/show_evidence.py
 core
 core.*
