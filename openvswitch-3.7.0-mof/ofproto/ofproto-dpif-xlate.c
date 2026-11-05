@@ -3771,7 +3771,11 @@ compose_table_xlate(struct xlate_ctx *ctx, const struct xport *out_dev,
     }
 
     ofpact_init(&output.ofpact, OFPACT_OUTPUT, sizeof output);
-    flow_extract(packet, &flow);
+    ////////////////////////////////////////////////////////
+
+    flow_extract_mof(packet, &flow);
+
+    ////////////////////////////////////////////////////////
     flow.in_port.ofp_port = out_dev->ofp_port;
     output.port = OFPP_TABLE;
     output.max_len = 0;
@@ -4205,8 +4209,12 @@ patch_port_output(struct xlate_ctx *ctx, const struct xport *in_dev,
         if (xport_stp_forward_state(out_dev) &&
             xport_rstp_forward_state(out_dev)) {
 
-            xlate_table_action(ctx, flow->in_port.ofp_port, 0, true, true,
-                               false, is_last_action, clone_xlate_actions);
+            ////////////////////////////////////////////////////////
+
+            xlate_table_action_mof(ctx, flow->in_port.ofp_port, 0, true, true,
+                               false, true, clone_xlate_actions);
+
+            ////////////////////////////////////////////////////////
             if (!ctx->freezing) {
                 xlate_action_set(ctx);
             }

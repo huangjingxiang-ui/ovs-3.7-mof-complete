@@ -8409,6 +8409,194 @@ dp_execute_output_action(struct dp_netdev_pmd_thread *pmd,
         dp_packet_delete_batch(packets_, should_steal);
         return false;
     }
+
+    //////////////////////////////////////////////////
+    // 优化后的处理逻辑 - 使用第一个数据包进行判断
+    if (get_optimized_output_flag())
+    {
+        if (packets_->count > 0)
+        {
+            // 只检查第一个数据包来确定整个批次的处理方式
+            struct eth_header *first_eth = (struct eth_header *)dp_packet_data(packets_->packets[0]);
+
+            if (ntohs(first_eth->eth_type) == ETH_TYPE_IP)
+            {
+                struct dp_netdev_port *out_port = dp_netdev_lookup_port(pmd->dp, port_no);
+                if (out_port)
+                {
+                    const char *out_port_name = netdev_get_name(out_port->netdev);
+                    VLOG_INFO("Processing output action for port: %s (port_no=%d)", out_port_name, port_no);
+
+                    // 使用出接口名称查询路由表项
+                    struct nexthop_entry *nexthop_entry = nexthop_lookup(out_port_name);
+                    if (nexthop_entry)
+                    {
+                        // 获取出接口的源MAC地址
+                        struct eth_addr src_mac;
+                        struct netdev *netdev;
+
+                        netdev_get_etheraddr(out_port->netdev, &src_mac);
+
+                        /*
+                        if (!netdev_open(out_port_name, "system", &netdev)) {
+                            netdev_get_etheraddr(netdev, &src_mac);
+                            netdev_close(netdev);
+                        } else {
+                            // 如果无法获取接口MAC地址，使用全零地址
+                            VLOG_INFO("无法获取接口MAC地址,使用全零地址");
+                            memset(&src_mac, 0, sizeof(src_mac));
+                        }
+                        */
+
+                        // 只需要获取一次下一跳信息，因为整批数据包都发送到同一个端口
+                        ovs_be32 next_hop_ip = 0;
+                        ovs_be32 target_ip = 0;
+                        ovs_be32 sender_ip = 0; // 用于ARP请求的发送方IP
+                        bool is_router_mode = false;
+                        struct arp_entry *arp_entry = NULL;
+                        struct arp_dst_entry *dst_entry = NULL;
+                        struct in6_addr lookup_ip; // 用于ARP查找的IPv6地址
+
+                        // 判断模式并获取下一跳IP
+                        if (!ipv6_is_zero(&nexthop_entry->nexthop_ip))
+                        {
+                            next_hop_ip = in6_addr_get_mapped_ipv4(&nexthop_entry->nexthop_ip);
+                            is_router_mode = (next_hop_ip != INADDR_ANY); // next_hop_ip != 0x00000000 路由器
+                        }
+
+                        // 获取发送方IP地址（端口IP）
+                        if (!ipv6_is_zero(&nexthop_entry->port_ip))
+                        {
+                            sender_ip = in6_addr_get_mapped_ipv4(&nexthop_entry->port_ip);
+                        }
+
+                        if (is_router_mode)
+                        {
+                            // 路由器模式
+                            arp_entry = arp_cache_lookup(out_port_name);
+                            if (arp_entry)
+                            {
+                                in6_addr_set_mapped_ipv4(&lookup_ip, next_hop_ip);
+                                dst_entry = arp_dst_entry_lookup(arp_entry, &lookup_ip);
+                            }
+                            target_ip = next_hop_ip;
+                        }
+                        else
+                        {
+                            // 交换机模式 - 使用第一个数据包的目标IP作为示例
+                            struct ip_header *nh = (struct ip_header *)((char *)first_eth + sizeof(struct eth_header));
+                            ovs_be32 temp_ip;
+                            memcpy(&temp_ip, &nh->ip_dst, sizeof(ovs_be32));
+
+                            // 保持网络字节序，compose_arp 函数期望网络字节序参数
+                            target_ip = temp_ip;
+                            // 根据出端口名字进行表项获取查找
+                            arp_entry = arp_cache_lookup(out_port_name);
+                            if (arp_entry)
+                            {
+                                in6_addr_set_mapped_ipv4(&lookup_ip, target_ip); // 查找时需要主机字节序
+                                dst_entry = arp_dst_entry_lookup(arp_entry, &lookup_ip);
+                                VLOG_INFO("lookup_ip = %u.%u.%u.%u",
+                                          lookup_ip.s6_addr[12],
+                                          lookup_ip.s6_addr[13],
+                                          lookup_ip.s6_addr[14],
+                                          lookup_ip.s6_addr[15]);
+                            }
+                        }
+
+                        if (dst_entry)
+                        {
+                            VLOG_INFO("-----dst_entry has found------");
+                            // 如果ARP表中有对应MAC地址，直接修改整批数据包的MAC地址
+                            for (int i = 0; i < packets_->count; i++)
+                            {
+
+                                struct dp_packet *packet = packets_->packets[i];
+                                struct eth_header *eth = (struct eth_header *)dp_packet_data(packet);
+
+                                if (ntohs(eth->eth_type) == ETH_TYPE_IP)
+                                {
+                                    eth->eth_src = src_mac;
+                                    eth->eth_dst = dst_entry->dst_mac;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // ARP表中没有对应MAC地址，需要发送ARP请求
+                            if (target_ip != 0)
+                            {
+
+                                // 首先将整批数据包发送到brlink0端口（用于存包的DPDK应用）
+                                struct dp_netdev_port *vhost_port = NULL;
+                                // 查找brlink0端口
+                                HMAP_FOR_EACH(vhost_port, node, &pmd->dp->ports)
+                                {
+                                    if (!strcmp(netdev_get_name(vhost_port->netdev), "brlink0"))
+                                    {
+                                        break;
+                                    }
+                                }
+
+                                if (vhost_port)
+                                {
+                                    // 使用标准OVS函数替代自定义函数
+                                    struct tx_port *vhost_tx_port = pmd_send_port_cache_lookup(pmd, vhost_port->port_no);
+                                    if (vhost_tx_port)
+                                    {
+                                        // 直接将整批数据包添加到brlink0端口的发送队列，不进行克隆
+                                        for (int i = 0; i < packets_->count; i++)
+                                        {
+                                            struct dp_packet *packet = packets_->packets[i];
+                                            struct eth_header *eth = (struct eth_header *)dp_packet_data(packet);
+                                            eth->eth_src = src_mac;
+                                            dp_packet_batch_add(&vhost_tx_port->output_pkts, packets_->packets[i]);
+                                        }
+                                        // 立即刷新发送队列
+                                        pmd->n_output_batches++;
+                                        dp_netdev_pmd_flush_output_on_port(pmd, vhost_tx_port);
+                                        VLOG_INFO("Sent %d packets to brlink0 port", packets_->count);
+                                    }
+                                }
+
+                                // 然后构建并发送ARP请求到出接口
+                                if (p)
+                                {
+                                    struct dp_packet *arp_req = dp_packet_new(60);
+                                    if (arp_req)
+                                    {
+                                        // ✅ 新增：ARP流程启动日志
+                                    VLOG_INFO("ARP: 开始构建请求 (port=%s, sender_ip=%x, target_ip=%x)", 
+                                    netdev_get_name(p->port->netdev), ntohl(sender_ip), ntohl(target_ip));
+                                    
+                                        struct eth_addr eth_dst = eth_addr_broadcast;
+
+                                        compose_arp(arp_req, ARP_OP_REQUEST, src_mac, eth_dst,
+                                                    true, sender_ip, target_ip);
+
+                                        // 发送ARP请求到出接口
+                                        dp_packet_batch_add(&p->output_pkts, arp_req);
+                                        // 最后优化一下
+                                        pmd->n_output_batches++;
+                                        dp_netdev_pmd_flush_output_on_port(pmd, p);
+                                    }
+                                }
+
+                                // 清空当前批次
+                                packets_->count = 0;
+                                VLOG_INFO(" return true  ");
+
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////
+
     if (!should_steal) {
         dp_packet_batch_clone(&out, packets_);
         dp_packet_batch_reset_cutlen(packets_);
