@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arp-cache.h"
+#include "arp-set.h"
 #include "coverage.h"
 #include "dp-packet.h"
 #include "dpctl.h"
@@ -33,6 +35,7 @@
 #include "netdev-provider.h"
 #include "netdev.h"
 #include "netlink.h"
+#include "nexthop.h"
 #include "odp-execute.h"
 #include "odp-util.h"
 #include "packets.h"
@@ -126,6 +129,9 @@ dp_initialize(void)
         tnl_port_map_init();
         tnl_neigh_cache_init();
         route_table_init();
+        bridge_arp_cache_init();
+        bridge_nexthop_init();
+        bridge_optimized_output_init();
         dpif_offload_module_init();
 
         for (i = 0; i < ARRAY_SIZE(base_dpif_classes); i++) {

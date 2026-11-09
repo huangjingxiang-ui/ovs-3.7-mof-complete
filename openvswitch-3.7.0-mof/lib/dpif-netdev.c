@@ -52,6 +52,8 @@
 #include "dummy.h"
 #include "fat-rwlock.h"
 #include "flow.h"
+#include "arp-cache.h"
+#include "arp-set.h"
 #include "hmapx.h"
 #include "id-fpool.h"
 #include "id-pool.h"
@@ -62,6 +64,7 @@
 #include "netdev-provider.h"
 #include "netdev-vport.h"
 #include "netlink.h"
+#include "nexthop.h"
 #include "odp-execute.h"
 #include "odp-util.h"
 #include "openvswitch/dynamic-string.h"
@@ -348,6 +351,8 @@ struct dp_netdev {
 static struct dp_netdev_port *dp_netdev_lookup_port(const struct dp_netdev *dp,
                                                     odp_port_t)
     OVS_REQ_RDLOCK(dp->port_rwlock);
+
+static void pmd_send_arp(struct dp_netdev_pmd_thread *pmd);
 
 enum rxq_cycles_counter_type {
     RXQ_CYCLES_PROC_CURR,       /* Cycles spent successfully polling and
@@ -2152,6 +2157,21 @@ do_add_port(struct dp_netdev *dp, const char *devname, const char *type,
     }
     port->sf = sf;
 
+    struct arp_entry e;
+    struct nexthop_entry entry;
+    memset(&e, 0, sizeof e);
+    memset(&entry, 0, sizeof entry);
+    e.odp_port = port->port_no;
+    const char *name = netdev_get_name(port->netdev);
+    netdev_get_etheraddr(port->netdev, &e.src_mac);
+    if (name) {
+        ovs_strlcpy(e.port_name, name, sizeof e.port_name);
+        ovs_strlcpy(entry.port_name, name, sizeof entry.port_name);
+    }
+
+    arp_cache_insert(&e);
+    route_insert(&entry);
+
     return 0;
 }
 
@@ -2303,6 +2323,12 @@ do_del_port(struct dp_netdev *dp, struct dp_netdev_port *port)
     seq_change(dp->port_seq);
 
     reconfigure_datapath(dp);
+
+    const char *name = netdev_get_name(port->netdev);
+    if (name) {
+        arp_cache_remove(name);
+    }
+
     port_destroy(port);
 }
 
@@ -6312,6 +6338,8 @@ dpif_netdev_run(struct dpif *dpif)
                                                    &port->rxqs[i],
                                                    port->port_no)) {
                         need_to_flush = false;
+                    } else if (arp_run()) {
+                        pmd_send_arp(non_pmd);
                     }
                 }
             }
@@ -6688,6 +6716,10 @@ reload:
 
         pmd_perf_end_iteration(s, rx_packets, tx_packets, time_slept,
                                pmd_perf_metrics_enabled(pmd));
+
+        if (arp_run()) {
+            pmd_send_arp(pmd);
+        }
     }
     ovs_mutex_unlock(&pmd->perf_stats.stats_mutex);
 
@@ -8159,6 +8191,78 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
                             upcall_fail_cnt);
 }
 
+/* 收包路径 ARP Reply 处理：把请求方 MAC/IP 存入 ARP 表的 dst 链表，
+ * 并从批次中移除 ARP 包，使其不进入后续 dfc/upcall 处理。 */
+static void
+arp_process_input(struct dp_netdev_pmd_thread *pmd,
+                  struct dp_packet_batch *packets)
+{
+    size_t out = 0;
+
+    for (size_t i = 0; i < dp_packet_batch_size(packets); i++) {
+        struct dp_packet *packet = packets->packets[i];
+        struct eth_header *eth = dp_packet_data(packet);
+
+        if (ntohs(eth->eth_type) == ETH_TYPE_ARP) {
+            struct arp_eth_header *arp = (struct arp_eth_header *)(eth + 1);
+
+            if (ntohs(arp->ar_op) == ARP_OP_REPLY) {
+                ovs_be32 spa = get_16aligned_be32(&arp->ar_spa);
+                struct in6_addr dst_ip6;
+                in6_addr_set_mapped_ipv4(&dst_ip6, spa);
+
+                struct eth_addr dst_mac;
+                memcpy(&dst_mac, &arp->ar_sha, ETH_ADDR_LEN);
+
+                odp_port_t in_port = packet->md.in_port.odp_port;
+                struct dp_netdev_port *port =
+                    dp_netdev_lookup_port(pmd->dp, in_port);
+                if (port) {
+                    const char *port_name = netdev_get_name(port->netdev);
+                    struct arp_entry *e = arp_cache_lookup(port_name);
+                    if (e) {
+                        struct arp_entry entry;
+                        memset(&entry, 0, sizeof entry);
+                        entry.src_ip = e->src_ip;
+                        entry.src_mac = e->src_mac;
+                        entry.odp_port = in_port;
+                        ovs_strlcpy(entry.port_name, port_name,
+                                    sizeof entry.port_name);
+
+                        struct arp_dst_entry *dst = xzalloc(sizeof *dst);
+                        dst->dst_ip = dst_ip6;
+                        dst->dst_mac = dst_mac;
+                        dst->next = entry.dst_list;
+                        entry.dst_list = dst;
+
+                        arp_cache_insert(&entry);
+                    }
+                }
+            }
+
+            dp_packet_delete(packet);
+        } else {
+            packets->packets[out++] = packet;
+        }
+    }
+
+    packets->count = out;
+}
+
+/* 周期性 ARP 触发入口。主动周期发送保持禁用（与参考实现一致），
+ * ARP 请求由出方向 dp_execute_output_action 按需发送。 */
+static void
+pmd_send_arp(struct dp_netdev_pmd_thread *pmd)
+{
+    struct tx_port *p;
+
+    HMAP_FOR_EACH (p, node, &pmd->send_port_cache) {
+        if (odp_to_u32(p->port->port_no) > 0) {
+            /* no-op：主动周期发送 ARP 请求已禁用。 */
+        }
+    }
+}
+
 /* Packets enter the datapath from a port (or from recirculation) here.
  *
  * When 'md_is_valid' is true the metadata in 'packets' are already valid.
@@ -8186,6 +8290,9 @@ dp_netdev_input__(struct dp_netdev_pmd_thread *pmd,
     odp_port_t in_port;
 
     n_batches = 0;
+
+    arp_process_input(pmd, packets);
+
     dfc_processing(pmd, packets, keys, missed_keys, batches, &n_batches,
                    flow_map, &n_flows, index_map, md_is_valid, port_no);
 
