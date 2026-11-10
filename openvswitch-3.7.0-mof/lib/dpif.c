@@ -53,6 +53,7 @@
 #include "openvswitch/shash.h"
 #include "openvswitch/usdt-probes.h"
 #include "openvswitch/vlog.h"
+#include "lib/ddos_dec.h"
 
 VLOG_DEFINE_THIS_MODULE(dpif);
 
@@ -127,7 +128,7 @@ dp_initialize(void)
         tnl_neigh_cache_init();
         route_table_init();
         dpif_offload_module_init();
-
+        ddos_init();
         for (i = 0; i < ARRAY_SIZE(base_dpif_classes); i++) {
             dp_register_provider(base_dpif_classes[i]);
         }
