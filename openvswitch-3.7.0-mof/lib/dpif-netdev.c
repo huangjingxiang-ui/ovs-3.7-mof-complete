@@ -106,6 +106,8 @@ DEFINE_STATIC_PER_THREAD_DATA(uint32_t, recirc_depth, 0)
 /* Use instant packet send by default. */
 #define DEFAULT_TX_FLUSH_INTERVAL 0
 
+#define REASSEMBLE_TIMESTAMP 3000
+
 /* Configuration parameters. */
 enum
 {
@@ -8614,6 +8616,282 @@ dfc_processing_enqueue_classified_packet(struct dp_packet *packet,
                                    flow_map, (*map_cnt)++);
     }
 }
+int need_to_ip_reassemble(struct dp_packet *pkt)
+{
+    struct eth_header *eth = dp_packet_data(pkt);
+    bool is_ipv6 = (eth->eth_type == htons(ETH_TYPE_IPV6));
+    bool is_ipv4 = (eth->eth_type == htons(ETH_TYPE_IP));
+    if (is_ipv6)
+    {
+        struct ovs_16aligned_ip6_hdr *ip6h = (struct ovs_16aligned_ip6_hdr *)((char *)eth + sizeof(struct eth_header));
+        size_t ext_headers_len = 0;
+        uint8_t next_header = ip6h->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+        while (next_header == IPPROTO_HOPOPTS || next_header == IPPROTO_DSTOPTS || next_header == IPPROTO_ROUTING)
+        {
+            next_header = ((struct ovs_16aligned_ip6_frag *)((char *)ip6h + sizeof(struct ovs_16aligned_ip6_hdr) + ext_headers_len))->ip6f_nxt;
+            ext_headers_len += sizeof(struct ovs_16aligned_ip6_frag);
+        }
+        if (next_header == IPPROTO_FRAGMENT)
+        {
+            return ext_headers_len;
+        }
+    }
+    else if (is_ipv4)
+    {
+        struct ip_header *iph = (struct ip_header *)((char *)eth + sizeof(struct eth_header));
+        uint16_t frag_off = ntohs(iph->ip_frag_off) & IP_FRAG_OFF_MASK;
+        bool more_fragments = (ntohs(iph->ip_frag_off) & IP_MORE_FRAGMENTS);
+
+        if (more_fragments || frag_off != 0)
+            /* 非分片包或最后一个分片且无偏移，直接返回 */
+            return 1;
+    }
+
+    return -1;
+}
+uint32_t ipv4_generate_frag_hash_key(struct eth_header *eth, struct ip_header *iph)
+{
+    uint32_t hash = 0;
+
+    hash = hash_add_bytes32(hash, &eth->eth_src, ETH_ADDR_LEN);
+    hash = hash_add_bytes32(hash, &eth->eth_dst, ETH_ADDR_LEN);
+    hash = hash_add(hash, eth->eth_type);
+    hash = hash_add_bytes32(hash, &iph->ip_src, sizeof(iph->ip_src));
+    hash = hash_add_bytes32(hash, &iph->ip_dst, sizeof(iph->ip_dst));
+    hash = hash_add(hash, iph->ip_id);
+    hash = hash_add(hash, iph->ip_id);
+    hash = hash_finish(hash, 42);
+    VLOG_INFO("generate_frag_hash_key's hash key is %u", hash);
+    return hash % FRAG_HASH_SIZE;
+}
+uint32_t ipv6_generate_frag_hash_key(struct eth_header *eth, struct ovs_16aligned_ip6_hdr *ip6h, ovs_16aligned_be32 ip6f_ident)
+{
+    uint32_t hash = 0;
+
+    hash = hash_add_bytes32(hash, &eth->eth_src, ETH_ADDR_LEN);
+    hash = hash_add_bytes32(hash, &eth->eth_dst, ETH_ADDR_LEN);
+    hash = hash_add(hash, eth->eth_type);
+    hash = hash_add_bytes32(hash, &ip6h->ip6_src, sizeof(ip6h->ip6_src));
+    hash = hash_add_bytes32(hash, &ip6h->ip6_dst, sizeof(ip6h->ip6_dst));
+    hash = hash_add_bytes32(hash, &ip6f_ident, sizeof(ovs_16aligned_be32));
+    hash = hash_finish(hash, 42);
+    VLOG_INFO("generate_frag_hash_key's hash key is %u", hash);
+    return hash % FRAG_HASH_SIZE;
+}
+struct dp_packet *ipv4_reassemble_two_frags(struct dp_packet *frag1, struct dp_packet *frag2)
+{
+    struct pkt_metadata *md_src = &frag1->md;
+    struct eth_header *eth1 = dp_packet_data(frag1);
+    struct ip_header *iph1 = (void *)((char *)eth1 + sizeof(struct eth_header));
+    struct eth_header *eth2 = dp_packet_data(frag2);
+    struct ip_header *iph2 = (void *)((char *)eth2 + sizeof(struct eth_header));
+
+    size_t iph_len1 = (iph1->ip_ihl_ver & 0x0F) * 4;
+    size_t iph_len2 = (iph2->ip_ihl_ver & 0x0F) * 4;
+
+    size_t payload1 = ntohs(iph1->ip_tot_len) - iph_len1;
+    size_t payload2 = ntohs(iph2->ip_tot_len) - iph_len2;
+
+    size_t total_size = sizeof(struct eth_header) + sizeof(struct ip_header) + payload1 + payload2;
+    struct dp_packet *reassembled = dp_packet_new(total_size);
+    struct pkt_metadata *md_dst = &reassembled->md;
+    /* 复制以太网头 */
+    memcpy(dp_packet_put_uninit(reassembled, sizeof(struct eth_header)), eth1, sizeof(struct eth_header));
+
+    /* 合并 IP 头部（使用第一个分片的 IP 头） */
+    iph1->ip_tot_len = htons(ntohs(iph1->ip_tot_len) + payload2);
+    iph1->ip_frag_off = 0; // 清除分片标志
+    iph1->ip_csum = 0;     // 强制重新计算校验和
+
+    memcpy(dp_packet_put_uninit(reassembled, iph_len1), iph1, iph_len1);
+
+    /* 复制第一个分片的数据部分 */
+    memcpy(dp_packet_put_uninit(reassembled, payload1),
+           (char *)iph1 + iph_len1, payload1);
+
+    /* 复制第二个分片的数据部分 */
+    memcpy(dp_packet_put_uninit(reassembled, payload2),
+           (char *)iph2 + iph_len2, payload2);
+    memcpy(md_dst, md_src, sizeof(struct pkt_metadata));
+
+    dp_packet_delete(frag1);
+    dp_packet_delete(frag2);
+    return reassembled;
+}
+
+struct dp_packet *ipv6_reassemble_two_frags(struct dp_packet *frag1, struct dp_packet *frag2, int ext_len)
+{
+    VLOG_INFO("enter ipv6_reassemble_two_frags");
+    struct pkt_metadata *md_src = &frag1->md;
+    struct eth_header *eth1 = dp_packet_data(frag1);
+    struct ovs_16aligned_ip6_hdr *ip6h1 = (void *)((char *)eth1 + sizeof(struct eth_header));
+    struct eth_header *eth2 = dp_packet_data(frag2);
+    struct ovs_16aligned_ip6_hdr *ip6h2 = (void *)((char *)eth2 + sizeof(struct eth_header));
+    size_t ipv6_header_len = sizeof(struct ovs_16aligned_ip6_hdr);
+    size_t frag_header_len = sizeof(struct ovs_16aligned_ip6_frag);
+    size_t payload1 = ntohs(ip6h1->ip6_ctlun.ip6_un1.ip6_un1_plen) - ext_len - frag_header_len;
+    size_t payload2 = ntohs(ip6h2->ip6_ctlun.ip6_un1.ip6_un1_plen) - ext_len - frag_header_len;
+    VLOG_INFO("payload1 is %d,payload2 is %d", payload1, payload2);
+    size_t total_size = sizeof(struct eth_header) + ipv6_header_len + ext_len + payload1 + payload2;
+    VLOG_INFO("total_size is %d", total_size);
+    struct dp_packet *reassembled = dp_packet_new(total_size);
+    struct pkt_metadata *md_dst = &reassembled->md;
+    /* 复制以太网头 */
+    memcpy(dp_packet_put_uninit(reassembled, sizeof(struct eth_header)), eth1, sizeof(struct eth_header));
+
+    /* 合并 IP 头部（使用第一个分片的 IP 头） */
+    ip6h1->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(ntohs(ip6h1->ip6_ctlun.ip6_un1.ip6_un1_plen) + payload2 - frag_header_len);
+
+    uint8_t next_header = ((struct ovs_16aligned_ip6_frag *)((char *)ip6h1 + ipv6_header_len + ext_len))->ip6f_nxt;
+    if (ext_len == 0)
+    {
+        ip6h1->ip6_ctlun.ip6_un1.ip6_un1_nxt = next_header;
+        memcpy(dp_packet_put_uninit(reassembled, ipv6_header_len), ip6h1, ipv6_header_len);
+    }
+    else
+    {
+        memcpy(dp_packet_put_uninit(reassembled, ipv6_header_len), ip6h1, ipv6_header_len);
+        for (int i = 0; i < ext_len; i += frag_header_len)
+        {
+            struct ovs_16aligned_ip6_frag *frag = xmalloc(frag_header_len);
+            memcpy(frag, (char *)(ip6h1 + ipv6_header_len + i), frag_header_len);
+            if (i == ext_len - frag_header_len)
+            {
+                frag->ip6f_nxt = next_header;
+            }
+            memcpy(dp_packet_put_uninit(reassembled, frag_header_len), frag, frag_header_len);
+            free(frag);
+        }
+    }
+
+    /* 复制第一个分片的数据部分 */
+    memcpy(dp_packet_put_uninit(reassembled, payload1),
+           (char *)ip6h1 + ipv6_header_len + ext_len + frag_header_len, payload1);
+
+    /* 复制第二个分片的数据部分 */
+    memcpy(dp_packet_put_uninit(reassembled, payload2),
+           (char *)ip6h2 + ipv6_header_len + ext_len + frag_header_len, payload2);
+    memcpy(md_dst, md_src, sizeof(struct pkt_metadata));
+    dp_packet_delete(frag1);
+    dp_packet_delete(frag2);
+    return reassembled;
+}
+struct dp_packet *ipv4_reassemble(struct dp_packet *pkt, struct ipv4_frag_table *table)
+{
+    struct eth_header *eth = dp_packet_data(pkt);
+    struct ip_header *iph = (struct ip_header *)((char *)eth + sizeof(struct eth_header));
+    uint16_t frag_off = ntohs(iph->ip_frag_off) & IP_FRAG_OFF_MASK;
+    bool more_fragments = (ntohs(iph->ip_frag_off) & IP_MORE_FRAGMENTS);
+
+    uint32_t bucket_idx = ipv4_generate_frag_hash_key(eth, iph);
+    struct ipv4_frag_bucket *bucket = &table->buckets[bucket_idx];
+    int insert_idx = -1;
+    long long int now = time_msec();
+    for (int i = 0; i < FRAG_EACH_BUCKET; i++)
+    {
+        struct ipv4_frag_info *info = &bucket->entries[i];
+        if (info->ip_id == 0 || (insert_idx == -1 && (now - info->time_stamp) >= REASSEMBLE_TIMESTAMP))
+        {
+            insert_idx = i;
+        }
+        else
+        {
+            struct ip_header *other_iph = (void *)((char *)dp_packet_data(info->packet) +
+                                                   sizeof(struct eth_header));
+            if (ntohs(iph->ip_id) == ntohs(other_iph->ip_id))
+            {
+                struct dp_packet *reassembled_pkt;
+                /* 找到匹配的一对分片，开始重组 */
+                if (more_fragments)
+                    reassembled_pkt = ipv4_reassemble_two_frags(pkt, info->packet);
+                else
+                    reassembled_pkt = ipv4_reassemble_two_frags(info->packet, pkt);
+
+                info->packet = NULL;
+                info->ip_id = 0;
+                return reassembled_pkt;
+            }
+        }
+    }
+    if (insert_idx != -1)
+    {
+        VLOG_INFO("cur entry is not full, insert the fragment");
+        bucket->entries[insert_idx].packet = dp_packet_clone(pkt);
+        bucket->entries[insert_idx].ip_id = ntohs(iph->ip_id);
+        dp_packet_delete(pkt);
+        return NULL;
+    }
+    else
+    {
+        VLOG_INFO("cur entry is full, will remove the first entry");
+        dp_packet_delete(bucket->entries[0].packet);
+        bucket->entries[0].packet = dp_packet_clone(pkt);
+        bucket->entries[0].ip_id = ntohs(iph->ip_id);
+        dp_packet_delete(pkt);
+    }
+    return NULL;
+}
+
+struct dp_packet *ipv6_reassemble(struct dp_packet *pkt, struct ipv6_frag_table *table, int ext_len)
+{
+    struct eth_header *eth = dp_packet_data(pkt);
+    struct ovs_16aligned_ip6_hdr *ip6h = (struct ovs_16aligned_ip6_hdr *)((char *)eth + sizeof(struct eth_header));
+    struct ovs_16aligned_ip6_frag *frag = (struct ovs_16aligned_ip6_frag *)((char *)ip6h + sizeof(struct ovs_16aligned_ip6_hdr) + ext_len);
+    uint16_t frag_off = ntohs(frag->ip6f_offlg) >> 3;
+    bool more_fragments = (ntohs(frag->ip6f_offlg) & 0x01);
+    if (more_fragments)
+        VLOG_INFO("more_fragments");
+    uint32_t bucket_idx = ipv6_generate_frag_hash_key(eth, ip6h, frag->ip6f_ident);
+    struct ipv6_frag_bucket *bucket = &table->buckets[bucket_idx];
+    int insert_idx = -1;
+    for (int i = 0; i < FRAG_EACH_BUCKET; i++)
+    {
+        struct ipv6_frag_info *info = &bucket->entries[i];
+        if (info->identification == 0)
+        {
+            if (insert_idx == -1)
+                insert_idx = i;
+        }
+        else if (ext_len == info->ext_len)
+        {
+            VLOG_INFO("else if (ext_len == info->ext_len)");
+            if (get_16aligned_be32(&frag->ip6f_ident) == info->identification)
+            {
+                struct dp_packet *reassembled_pkt;
+                /* 找到匹配的一对分片，开始重组 */
+                if (more_fragments)
+                    reassembled_pkt = ipv6_reassemble_two_frags(pkt, info->packet, ext_len);
+                else
+                    reassembled_pkt = ipv6_reassemble_two_frags(info->packet, pkt, ext_len);
+                // dp_packet_delete(info->packet); // 清理缓存
+                info->packet = NULL;
+                info->identification = 0;
+                info->ext_len = -1;
+                return reassembled_pkt;
+            }
+        }
+    }
+    if (insert_idx != -1)
+    {
+        VLOG_INFO("cur entry is not full, insert the fragment");
+        bucket->entries[insert_idx].packet = dp_packet_clone(pkt);
+        bucket->entries[insert_idx].identification = get_16aligned_be32(&frag->ip6f_ident);
+        VLOG_INFO("the insert identification is %x", bucket->entries[insert_idx].identification);
+        bucket->entries[insert_idx].ext_len = ext_len;
+        dp_packet_delete(pkt);
+        return NULL;
+    }
+    else
+    {
+        VLOG_INFO("cur entry is full, will remove the first entry");
+        dp_packet_delete(bucket->entries[0].packet);
+        bucket->entries[0].packet = dp_packet_clone(pkt);
+        bucket->entries[0].identification = get_16aligned_be32(&frag->ip6f_ident);
+        bucket->entries[0].ext_len = ext_len;
+        dp_packet_delete(pkt);
+    }
+    return NULL;
+}
 
 /* Try to process all ('cnt') the 'packets' using only the datapath flow cache
  * 'pmd->flow_cache'. If a flow is not found for a packet 'packets[i]', the
@@ -8724,6 +9002,64 @@ dfc_processing(struct dp_netdev_pmd_thread *pmd,
                 dfc_processing_enqueue_classified_packet(
                     packet, flow, tcp_flags, batch_enable,
                     batches, n_batches, flow_map, &map_cnt);
+                continue;
+            }
+        }
+        int ext_len = need_to_ip_reassemble(packet);
+        if (ext_len >= 0)
+        {
+            struct dp_packet *reassembled_pkt;
+            if (ext_len == 1)
+            {
+                reassembled_pkt = ipv4_reassemble(packet, &cache->ipv4_frag_table);
+            }
+            else
+            {
+                reassembled_pkt = ipv6_reassemble(packet, &cache->ipv6_frag_table, ext_len);
+            }
+            if (reassembled_pkt)
+            {
+                miniflow_extract_mof(packet, &key->mf);
+                key->len = 0; /* Not computed yet. */
+                key->hash =
+                    (md_is_valid == false)
+                        ? dpif_netdev_packet_get_rss_hash_orig_pkt(packet, &key->mf)
+                        : dpif_netdev_packet_get_rss_hash(packet, &key->mf);
+
+                /* If EMC is disabled skip emc_lookup */
+                flow = (cur_min != 0) ? emc_lookup(&cache->emc_cache, key) : NULL;
+                if (OVS_LIKELY(flow))
+                {
+                    tcp_flags = miniflow_get_tcp_flags(&key->mf);
+                    n_emc_hit++;
+                    dfc_processing_enqueue_classified_packet(
+                        packet, flow, tcp_flags, batch_enable,
+                        batches, n_batches, flow_map, &map_cnt);
+                }
+                else
+                {
+                    /* Exact match cache missed. Group missed packets together at
+                     * the beginning of the 'packets' array. */
+                    dp_packet_batch_refill(packets_, packet, i);
+
+                    /* Preserve the order of packet for flow batching. */
+                    index_map[n_missed] = map_cnt;
+                    flow_map[map_cnt++].flow = NULL;
+
+                    /* 'key[n_missed]' contains the key of the current packet and it
+                     * will be passed to SMC lookup. The next key should be extracted
+                     * to 'keys[n_missed + 1]'.
+                     * We also maintain a pointer array to keys missed both SMC and EMC
+                     * which will be returned to the caller for future processing. */
+                    missed_keys[n_missed] = key;
+                    key = &keys[++n_missed];
+
+                    /* Skip batching for subsequent packets to avoid reordering. */
+                    batch_enable = false;
+                }
+            }
+            else
+            {
                 continue;
             }
         }
@@ -9236,7 +9572,8 @@ push_tnl_action(const struct dp_netdev_pmd_thread *pmd,
         err = -EINVAL;
         goto error;
     }
-    err = netdev_push_header(tun_port->port->netdev, batch, data);
+    err = netdev_push_header_mof(tun_port->port->netdev, batch, data);
+    // err = netdev_push_header(tun_port->port->netdev, batch, data);
     if (!err)
     {
         return 0;

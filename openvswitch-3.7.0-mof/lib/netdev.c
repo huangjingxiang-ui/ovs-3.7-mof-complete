@@ -1001,6 +1001,269 @@ int netdev_build_header(const struct netdev *netdev,
  *
  * The caller must make sure that 'netdev' support this operation by checking
  * that netdev_has_tunnel_push_pop() returns true. */
+void dp_packet_set_ip_header(struct ip_header *iph, size_t offset,
+                             bool more_fragments, uint16_t frag_offset)
+{
+    iph->ip_ihl_ver = IP_IHL_VER(5, 4);
+    // iph->ip_ttl = 64;
+    iph->ip_tot_len = htons(offset + sizeof(struct ip_header));
+    /* 分片标志和偏移 */
+    uint16_t frag_flags = 0;
+    if (more_fragments)
+    {
+        frag_flags |= IP_MORE_FRAGMENTS;
+    }
+    frag_flags |= (frag_offset / 8) & IP_FRAG_OFF_MASK;
+
+    iph->ip_frag_off = htons(frag_flags);
+
+    iph->ip_csum = 0;
+}
+
+static void
+dp_packet_ipv4_fragment(struct dp_packet *pkt, struct dp_packet_batch *batch, int mtu_without_tunnel, size_t header_len, void *data)
+{
+    struct eth_header *eth = (struct eth_header *)data;
+
+    struct ip_header *iph = (struct ip_header *)((char *)eth + sizeof(struct eth_header));
+    // int mtu_without_tunnel = mtu - 50;
+    int payload_left = ntohs(iph->ip_tot_len) - (iph->ip_ihl_ver & 0x0F) * 4;
+    int frag_offset = 0;
+    int frag_index = 0;
+    // 计算每个分片的最大数据长度（需要是8字节的倍数）
+    int max_frag_data_len = ROUND_DOWN(mtu_without_tunnel - header_len - (iph->ip_ihl_ver & 0x0F) * 4, 8);
+
+    while (payload_left > 0)
+    {
+        size_t this_frag_data_len = MIN(max_frag_data_len, payload_left);
+        struct dp_packet *frag_pkt = dp_packet_new(this_frag_data_len + header_len + sizeof(struct ip_header));
+
+        if (!frag_pkt)
+        {
+            break;
+        }
+
+        // 复制以太网头部
+        memcpy(dp_packet_put_uninit(frag_pkt, header_len),
+               data, header_len);
+        // 复制IP头部并修改分片相关字段
+        struct ip_header *new_iph = xmalloc(sizeof(struct ip_header));
+        memcpy(new_iph, iph, sizeof(struct ip_header));
+        // 设置分片相关字段
+        bool more_fragments = (payload_left > this_frag_data_len);
+        dp_packet_set_ip_header(new_iph, this_frag_data_len, more_fragments, frag_offset);
+        memcpy(dp_packet_put_uninit(frag_pkt, (new_iph->ip_ihl_ver & 0x0F) * 4), new_iph, (new_iph->ip_ihl_ver & 0x0F) * 4);
+        free(new_iph);
+        // 复制原始IP数据部分
+        memcpy(dp_packet_put_uninit(frag_pkt, this_frag_data_len),
+               (char *)iph + (iph->ip_ihl_ver & 0x0F) * 4 + frag_offset,
+               this_frag_data_len);
+
+        dp_packet_batch_add(batch, frag_pkt);
+        frag_index++;
+
+        payload_left -= this_frag_data_len;
+        frag_offset += this_frag_data_len;
+    }
+}
+static void
+dp_packet_ipv6_fragment(struct dp_packet *pkt, struct dp_packet_batch *batch, int mtu_without_tunnel, size_t header_len, void *data)
+{
+    struct ovs_16aligned_ip6_hdr *ip6h = dp_packet_l3(pkt);
+    size_t ext_headers_len = 0;
+    uint8_t next_header = ip6h->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+
+    while (next_header == IPPROTO_HOPOPTS || next_header == IPPROTO_DSTOPTS || next_header == IPPROTO_ROUTING)
+    {
+        next_header = ((struct ovs_16aligned_ip6_frag *)((char *)ip6h + sizeof(struct ovs_16aligned_ip6_hdr) + ext_headers_len))->ip6f_nxt;
+        ext_headers_len += sizeof(struct ovs_16aligned_ip6_frag);
+    }
+    int payload_left = ntohs(ip6h->ip6_ctlun.ip6_un1.ip6_un1_plen) - ext_headers_len;
+    int frag_offset = 0;
+    int frag_index = 0;
+    uint32_t identification = random_uint32(); // IPv6分片标识
+
+    int frag_header_len = sizeof(struct ovs_16aligned_ip6_frag);
+
+    int max_frag_data_len = ROUND_DOWN(
+        mtu_without_tunnel - sizeof(struct eth_header) -
+            sizeof(struct ovs_16aligned_ip6_hdr) - ext_headers_len - frag_header_len,
+        8);
+    while (payload_left > 0)
+    {
+        size_t this_frag_data_len = MIN(max_frag_data_len, payload_left);
+
+        // 创建分片包，包含以太网头、IPv6头、分片头和数据
+        struct dp_packet *frag_pkt = dp_packet_new(
+            sizeof(struct eth_header) + sizeof(struct ovs_16aligned_ip6_hdr) + ext_headers_len + frag_header_len + this_frag_data_len);
+
+        if (!frag_pkt)
+        {
+            break;
+        }
+        // 复制以太网头部
+        memcpy(dp_packet_put_uninit(frag_pkt, header_len), data, header_len);
+        // 复制IPv6头部并修改
+        struct ovs_16aligned_ip6_hdr *new_ip6h = xmalloc(sizeof(struct ovs_16aligned_ip6_hdr));
+        memcpy(new_ip6h, ip6h, sizeof(struct ovs_16aligned_ip6_hdr));
+        new_ip6h->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(ext_headers_len + frag_header_len + this_frag_data_len);
+        // 如果原来没有ext头部，更新IPv6头部的下一个头部字段为分片扩展头部(44)
+        if (ext_headers_len == 0)
+        {
+            new_ip6h->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_FRAGMENT; // IPv6 Fragment Header
+            memcpy(dp_packet_put_uninit(frag_pkt, sizeof(struct ovs_16aligned_ip6_hdr)), new_ip6h, sizeof(struct ovs_16aligned_ip6_hdr));
+        }
+        else
+        {
+            memcpy(dp_packet_put_uninit(frag_pkt, sizeof(struct ovs_16aligned_ip6_hdr)), new_ip6h, sizeof(struct ovs_16aligned_ip6_hdr));
+            for (int i = 0; i < ext_headers_len; i += sizeof(struct ovs_16aligned_ip6_frag))
+            {
+                struct ovs_16aligned_ip6_frag *frag = xmalloc(sizeof(struct ovs_16aligned_ip6_frag));
+                memcpy(frag, (char *)(ip6h + sizeof(struct ovs_16aligned_ip6_hdr) + i), sizeof(struct ovs_16aligned_ip6_frag));
+                if (i == ext_headers_len - sizeof(struct ovs_16aligned_ip6_frag))
+                {
+                    next_header = frag->ip6f_nxt;
+                    frag->ip6f_nxt = IPPROTO_FRAGMENT;
+                }
+                memcpy(dp_packet_put_uninit(frag_pkt, sizeof(struct ovs_16aligned_ip6_frag)), frag, sizeof(struct ovs_16aligned_ip6_frag));
+                free(frag);
+            }
+        }
+        free(new_ip6h);
+        // 添加IPv6分片头部
+        struct ovs_16aligned_ip6_frag *frag_hdr = xmalloc(sizeof(struct ovs_16aligned_ip6_frag));
+        frag_hdr->ip6f_nxt = next_header;
+        frag_hdr->ip6f_reserved = 0;
+        // 设置分片偏移和标志
+        bool more_fragments = (payload_left > this_frag_data_len);
+        uint16_t frag_off = 0;
+        frag_off = frag_off | ((frag_offset / 8) << 3);
+        if (more_fragments)
+        {
+            frag_off = frag_off | 0x01; // 设置MF位
+        }
+        frag_hdr->ip6f_offlg = htons(frag_off);
+        put_16aligned_be32(&frag_hdr->ip6f_ident, htonl(identification));
+
+        memcpy(dp_packet_put_uninit(frag_pkt, sizeof(struct ovs_16aligned_ip6_frag)), frag_hdr, sizeof(struct ovs_16aligned_ip6_frag));
+        free(frag_hdr);
+
+        // 复制原始IPv6数据部分
+        char *payload_start = (char *)ip6h + sizeof(struct ovs_16aligned_ip6_hdr) + ext_headers_len;
+        memcpy(dp_packet_put_uninit(frag_pkt, this_frag_data_len),
+               payload_start + frag_offset,
+               this_frag_data_len);
+        frag_index++;
+
+        dp_packet_batch_add(batch, frag_pkt);
+
+        payload_left -= this_frag_data_len;
+        frag_offset += this_frag_data_len;
+    }
+}
+struct dp_packet_batch *
+dp_packet_ip_fragment(struct dp_packet *pkt, int mtu, size_t tunnel_header_len)
+{
+    struct dp_packet_batch *batch = xmalloc(sizeof(*batch));
+    dp_packet_batch_init(batch);
+
+    void *data = dp_packet_data(pkt);
+    size_t total_len = dp_packet_size(pkt);
+    size_t header_len = ETH_HEADER_LEN;
+    struct eth_header *eth = data;
+
+    bool is_ipv6 = (eth->eth_type == htons(ETH_TYPE_IPV6));
+    int mtu_without_tunnel = mtu - tunnel_header_len;
+
+    if (total_len <= mtu_without_tunnel)
+    {
+        // 如果数据包不需要分片，直接添加到batch
+        dp_packet_batch_add(batch, dp_packet_clone(pkt));
+        return batch;
+    }
+    else
+    {
+        if (is_ipv6)
+        {
+            dp_packet_ipv6_fragment(pkt, batch, mtu_without_tunnel, header_len, data);
+        }
+        else
+        {
+            dp_packet_ipv4_fragment(pkt, batch, mtu_without_tunnel, header_len, data);
+        }
+    }
+    return batch;
+}
+int netdev_push_header_mof(const struct netdev *netdev,
+                           struct dp_packet_batch *batch,
+                           const struct ovs_action_push_tnl *data)
+{
+    struct dp_packet *packet;
+    size_t i, size = dp_packet_batch_size(batch);
+    int mtu = ETH_PAYLOAD_MAX; // 或者从 data 或 netdev 获取实际 MTU
+    size_t tunnel_header_len = data->header_len;
+    int pkt_num = 0;
+    struct dp_packet_batch fragments_batch;
+    dp_packet_batch_init(&fragments_batch);
+    DP_PACKET_BATCH_REFILL_FOR_EACH(i, size, packet, batch)
+    {
+        if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet) ||
+                         dp_packet_hwol_l4_mask(packet)))
+        {
+            COVERAGE_INC(netdev_push_header_drops);
+            dp_packet_delete(packet);
+            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is not supported: packet dropped",
+                         netdev_get_name(netdev));
+            continue;
+        }
+
+        /* 检查数据包是否超过 MTU */
+        if (dp_packet_size(packet) + tunnel_header_len > mtu)
+        {
+            struct dp_packet_batch *fragments = NULL;
+            /* 执行 IP 分片操作，返回分片的数据包批量结构体 */
+            fragments = dp_packet_ip_fragment(packet, mtu, tunnel_header_len);
+            if (fragments && !dp_packet_batch_is_empty(fragments))
+            {
+                struct dp_packet *frag;
+                size_t j, frag_count = dp_packet_batch_size(fragments);
+
+                /* 将每个分片加入到原 batch 中，并做封装 */
+                DP_PACKET_BATCH_FOR_EACH(j, frag, fragments)
+                {
+                    netdev->netdev_class->push_header(netdev, frag, data);
+                    pkt_metadata_init(&frag->md, data->out_port);
+                    dp_packet_batch_add(&fragments_batch, frag);
+                }
+                /* 清空 fragments 批量结构但不释放数据包，因为已加入 batch */
+                dp_packet_batch_refill_init(fragments);
+                free(fragments);
+            }
+
+            /* 原始数据包已经被分片处理，删除原始包 */
+            dp_packet_delete(packet);
+        }
+        else
+        {
+            /* 不需要分片，直接封装 */
+            netdev->netdev_class->push_header(netdev, packet, data);
+            pkt_metadata_init(&packet->md, data->out_port);
+            dp_packet_batch_add(&fragments_batch, packet);
+        }
+    }
+
+    int frag_size = dp_packet_batch_size(&fragments_batch);
+    struct dp_packet *tmp;
+    dp_packet_batch_init(batch);
+    for (int j = 0; j < frag_size; j++)
+    {
+        tmp = fragments_batch.packets[j];
+        dp_packet_batch_add(batch, tmp);
+    }
+    batch->trunc = fragments_batch.trunc;
+    return 0;
+}
+
 int
 netdev_push_header(const struct netdev *netdev,
                    struct dp_packet_batch *batch,

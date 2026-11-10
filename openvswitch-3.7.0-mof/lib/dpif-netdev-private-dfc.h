@@ -82,6 +82,9 @@ extern "C" {
 #define DEFAULT_EM_FLOW_INSERT_MIN (UINT32_MAX /                     \
                                     DEFAULT_EM_FLOW_INSERT_INV_PROB)
 
+#define FRAG_EACH_BUCKET 16
+#define FRAG_HASH_SIZE 4096
+
 /* Forward declaration for SMC function prototype that requires access to
  * 'struct dp_netdev_pmd_thread'. */
 struct dp_netdev_pmd_thread;
@@ -113,6 +116,42 @@ struct smc_cache {
 struct dfc_cache {
     struct emc_cache emc_cache;
     struct smc_cache smc_cache;
+    struct ipv4_frag_table ipv4_frag_table;
+    struct ipv6_frag_table ipv6_frag_table;
+};
+
+struct ipv4_frag_info
+{
+    struct dp_packet *packet; // 当前缓存的分片
+    uint16_t ip_id;
+    long long int time_stamp;
+};
+
+struct ipv4_frag_bucket
+{
+    struct ipv4_frag_info entries[FRAG_EACH_BUCKET];
+};
+struct ipv4_frag_table
+{
+    struct ipv4_frag_bucket buckets[FRAG_HASH_SIZE];
+    int cout;
+};
+
+struct ipv6_frag_info
+{
+    struct dp_packet *packet; // 当前缓存的分片
+    ovs_be32 identification;
+    int ext_len;
+    long long int time_stamp;
+};
+
+struct ipv6_frag_bucket
+{
+    struct ipv6_frag_info entries[FRAG_EACH_BUCKET];
+};
+struct ipv6_frag_table
+{
+    struct ipv6_frag_bucket buckets[FRAG_HASH_SIZE];
 };
 
 /* Iterate in the exact match cache through every entry that might contain a
