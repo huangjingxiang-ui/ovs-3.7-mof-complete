@@ -1207,19 +1207,43 @@ int netdev_push_header_mof(const struct netdev *netdev,
     dp_packet_batch_init(&fragments_batch);
     DP_PACKET_BATCH_REFILL_FOR_EACH(i, size, packet, batch)
     {
-        if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet) ||
-                         dp_packet_hwol_l4_mask(packet)))
-        {
+        if (OVS_UNLIKELY(data->tnl_type != OVS_VPORT_TYPE_GENEVE &&
+                         data->tnl_type != OVS_VPORT_TYPE_VXLAN &&
+                         data->tnl_type != OVS_VPORT_TYPE_GRE &&
+                         data->tnl_type != OVS_VPORT_TYPE_IP6GRE &&
+                         dp_packet_get_tso_segsz(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
-            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is not supported: packet dropped",
-                         netdev_get_name(netdev));
+            VLOG_WARN_RL(&rl, "%s: Tunneling packets with TSO is not "
+                              "supported for %s tunnels: packet dropped",
+                         netdev_get_name(netdev), netdev_get_type(netdev));
             continue;
         }
 
+        if (data->tnl_type != OVS_VPORT_TYPE_GENEVE &&
+            data->tnl_type != OVS_VPORT_TYPE_VXLAN &&
+            data->tnl_type != OVS_VPORT_TYPE_GRE &&
+            data->tnl_type != OVS_VPORT_TYPE_IP6GRE) {
+            dp_packet_ol_send_prepare(packet, 0);
+        } else if (dp_packet_tunnel(packet)) {
+            if (dp_packet_get_tso_segsz(packet)) {
+                COVERAGE_INC(netdev_push_header_drops);
+                dp_packet_delete(packet);
+                VLOG_WARN_RL(&rl, "%s: Tunneling packets with TSO is not "
+                                  "supported with multiple levels of "
+                                  "VXLAN, GENEVE, or GRE encapsulation.",
+                             netdev_get_name(netdev));
+                continue;
+            }
+            dp_packet_ol_send_prepare(packet, 0);
+        }
+
         /* 检查数据包是否超过 MTU */
-        if (dp_packet_size(packet) + tunnel_header_len > mtu)
+        if (!dp_packet_get_tso_segsz(packet) &&
+            dp_packet_size(packet) + tunnel_header_len > mtu)
         {
+            /* Complete checksums before splitting a non-TSO packet. */
+            dp_packet_ol_send_prepare(packet, 0);
             struct dp_packet_batch *fragments = NULL;
             /* 执行 IP 分片操作，返回分片的数据包批量结构体 */
             fragments = dp_packet_ip_fragment(packet, mtu, tunnel_header_len);

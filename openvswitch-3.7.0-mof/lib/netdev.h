@@ -261,6 +261,9 @@ int netdev_build_header(const struct netdev *, struct ovs_action_push_tnl *data,
 int netdev_push_header(const struct netdev *netdev,
                        struct dp_packet_batch *,
                        const struct ovs_action_push_tnl *data);
+int netdev_push_header_mof(const struct netdev *netdev,
+                           struct dp_packet_batch *,
+                           const struct ovs_action_push_tnl *data);
 void netdev_pop_header(struct netdev *netdev, struct dp_packet_batch *);
 
 /* Hardware address. */

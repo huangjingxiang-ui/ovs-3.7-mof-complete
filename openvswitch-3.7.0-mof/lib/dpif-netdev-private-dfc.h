@@ -113,13 +113,6 @@ struct smc_cache {
     struct smc_bucket buckets[SMC_BUCKET_CNT];
 };
 
-struct dfc_cache {
-    struct emc_cache emc_cache;
-    struct smc_cache smc_cache;
-    struct ipv4_frag_table ipv4_frag_table;
-    struct ipv6_frag_table ipv6_frag_table;
-};
-
 struct ipv4_frag_info
 {
     struct dp_packet *packet; // 当前缓存的分片
@@ -153,6 +146,14 @@ struct ipv6_frag_table
 {
     struct ipv6_frag_bucket buckets[FRAG_HASH_SIZE];
 };
+
+struct dfc_cache {
+    struct emc_cache emc_cache;
+    struct smc_cache smc_cache;
+    struct ipv4_frag_table ipv4_frag_table;
+    struct ipv6_frag_table ipv6_frag_table;
+};
+
 
 /* Iterate in the exact match cache through every entry that might contain a
  * miniflow with hash 'HASH'. */
