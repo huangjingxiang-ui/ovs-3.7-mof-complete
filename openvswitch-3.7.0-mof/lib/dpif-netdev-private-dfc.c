@@ -20,6 +20,69 @@
 
 #include "dpif-netdev-private-dfc.h"
 
+void ipv4_frag_table_init(struct ipv4_frag_table *table)
+{
+    for (int i = 0; i < FRAG_HASH_SIZE; i++)
+    {
+        for (int j = 0; j < FRAG_EACH_BUCKET; j++)
+        {
+            table->buckets[i].entries[j].packet = NULL;
+            table->buckets[i].entries[j].ip_id = 0;
+            table->buckets[i].entries[j].time_stamp = 0;
+        }
+    }
+}
+void ipv6_frag_table_init(struct ipv6_frag_table *table)
+{
+    for (int i = 0; i < FRAG_HASH_SIZE; i++)
+    {
+        for (int j = 0; j < FRAG_EACH_BUCKET; j++)
+        {
+            table->buckets[i].entries[j].packet = NULL;
+            table->buckets[i].entries[j].identification = 0;
+            table->buckets[i].entries[j].ext_len = -1;
+            table->buckets[i].entries[j].time_stamp = 0;
+        }
+    }
+}
+
+void ipv4_frag_table_uninit(struct ipv4_frag_table *table)
+{
+    int i, j;
+
+    for (i = 0; i < FRAG_HASH_SIZE; i++) {
+        for (j = 0; j < FRAG_EACH_BUCKET; j++) {
+            struct ipv4_frag_info *entry = &table->buckets[i].entries[j];
+
+            if (entry->packet) {
+                dp_packet_delete(entry->packet);
+                entry->packet = NULL;
+            }
+            entry->ip_id = 0;
+            entry->time_stamp = 0;
+        }
+    }
+    table->cout = 0;
+}
+void ipv6_frag_table_uninit(struct ipv6_frag_table *table)
+{
+    int i, j;
+
+    for (i = 0; i < FRAG_HASH_SIZE; i++) {
+        for (j = 0; j < FRAG_EACH_BUCKET; j++) {
+            struct ipv6_frag_info *entry = &table->buckets[i].entries[j];
+
+            if (entry->packet) {
+                dp_packet_delete(entry->packet);
+                entry->packet = NULL;
+            }
+            entry->identification = 0;
+            entry->ext_len = -1;
+            entry->time_stamp = 0;
+        }
+    }
+}
+
 static void
 emc_clear_entry(struct emc_entry *ce)
 {
@@ -65,6 +128,8 @@ dfc_cache_init(struct dfc_cache *flow_cache)
 {
     emc_cache_init(&flow_cache->emc_cache);
     smc_cache_init(&flow_cache->smc_cache);
+    ipv4_frag_table_init(&flow_cache->ipv4_frag_table);
+    ipv6_frag_table_init(&flow_cache->ipv6_frag_table);
 }
 
 static void
@@ -92,6 +157,8 @@ smc_cache_uninit(struct smc_cache *smc)
 void
 dfc_cache_uninit(struct dfc_cache *flow_cache)
 {
+    ipv6_frag_table_uninit(&flow_cache->ipv6_frag_table);
+    ipv4_frag_table_uninit(&flow_cache->ipv4_frag_table);
     smc_cache_uninit(&flow_cache->smc_cache);
     emc_cache_uninit(&flow_cache->emc_cache);
 }

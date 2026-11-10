@@ -53,6 +53,7 @@
 #include "openvswitch/vlog.h"
 #include "lib/vswitch-idl.h"
 #include "lib/dns-resolve.h"
+#include "lib/ddos_dec.h"
 
 VLOG_DEFINE_THIS_MODULE(vswitchd);
 
@@ -121,6 +122,7 @@ main(int argc, char *argv[])
                              ovs_vswitchd_exit, NULL);
 
     bridge_init(remote);
+    ddos_detect_init();
     free(remote);
 
     while (!exit_args.exiting) {
