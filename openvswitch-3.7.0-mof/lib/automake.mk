@@ -59,6 +59,14 @@ endif # HAVE_AVX512F
 lib_libopenvswitch_la_SOURCES = \
 	lib/aes128.c \
 	lib/aes128.h \
+	lib/arp.c \
+	lib/arp.h \
+	lib/arp-cache.c \
+	lib/arp-cache.h \
+	lib/arp-set.c \
+	lib/arp-set.h \
+	lib/nexthop.c \
+	lib/nexthop.h \
 	lib/async-append.h \
 	lib/backtrace.c \
 	lib/backtrace.h \
